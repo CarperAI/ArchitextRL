@@ -1,4 +1,5 @@
 from design_eval import eval_function
+from utils import *
 
 test_data = {
     'samples': ['[prompt] a house with seven rooms and a corridor [layout] bedroom1: (194,106)(165,106)(165,47)(194,47), living_room: (179,223)(106,223)(106,121)(165,121)(165,135)(179,135), bathroom1: (165,106)(135,106)(135,77)(165,77), bedroom2: (135,106)(91,106)(91,33)(135,33), bathroom2: (106,165)(77,165)(77,135)(106,135), bedroom3: (91,106)(77,106)(77,121)(47,121)(47,62)(91,62), kitchen: (209,194)(179,194)(179,135)(194,135)(194,121)(209,121), corridor: (194,135)(165,135)(165,121)(106,121)(106,135)(77,135)(77,106)(194,106) <|endoftext|>',
@@ -10,8 +11,9 @@ test_data = {
     'prompt_types': ['total_number_prompt', 'location_prompt', 'ind_number_prompt']
     }
 
-results = eval_function(test_data['samples'], test_data['prompts'], test_data['prompt_types'])
 
+semantic_accuracy = []
+reward = []
+samples, prompts, prompt_types = test_data['samples'], test_data['prompts'], test_data['prompt_types']
+results = eval_function(samples, prompts, prompt_types)
 print(results)
-
-

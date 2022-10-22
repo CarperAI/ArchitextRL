@@ -1,0 +1,68 @@
+  a house with five rooms   
+  a house with six rooms   
+  a house with seven rooms   
+  a house with eight rooms   
+  a house with nine rooms   
+  a house with ten rooms   
+ 
+ 
+  a house with one bedroom d one bathroom   
+  a house with one bedroom d two bathrooms   
+  a house with two bedrooms d one bathrooms   
+  a house with two bedrooms d two bathrooms   
+  a house with two bedrooms d three bathrooms   
+  a house with three bedrooms d one bathroom   
+  a house with three bedrooms d two bathrooms   
+  a house with three bedroom d three bathrooms   
+  a house with four bedrooms d one bathroom   
+  a house with four bedrooms d two bathrooms   
+  a house with four bedrooms d three bathrooms   
+  a house with four bedrooms d four bathrooms   
+ 
+ 
+  the bedroom is adjacent to the living room  
+  a bedroom is adjacent to the living room  
+  the bedroom is adjacent to the kitchen  
+  a bedroom is adjacent to the kitchen  
+  the bedroom is adjacent to the kitchen  
+  the kitchen is adjacent to the bathroom  
+  a bathroom is adjacent to the living room  
+  the bathroom is adjacent to the living room  
+ 
+ 
+  the bedroom is not adjacent to the living room  
+  a bedroom is not adjacent to the living room  
+  the bedroom is not adjacent to the kitchen  
+  a bedroom is not adjacent to the kitchen  
+  the bedroom is not adjacent to the kitchen  
+  the kitchen is not adjacent to the bathroom  
+  a bathroom is not adjacent to the living room  
+  the bathroom is not adjacent to the living room  
+ 
+ 
+  the bedroom is in the north side of the house  
+  the bedroom is in the north east side of the house  
+  the bedroom is in the east side of the house  
+  the bedroom is in the south east side of the house  
+  the bedroom is in the south side of the house  
+  the bedroom is in the south west side of the house  
+  the bedroom is in the west east side of the house  
+  the bedroom is in the north west side of the house  
+  the kitchen is in the north side of the house  
+  the kitchen is in the north east side of the house  
+  the kitchen is in the east side of the house  
+  the kitchen is in the south east side of the house  
+  the kitchen is in the south side of the house  
+  the kitchen is in the south west side of the house  
+  the kitchen is in the west east side of the house  
+  the kitchen is in the north west side of the house  
+ 
+ 
+  a bedroom is in the north side of the house  
+  a bedroom is in the north east side of the house  
+  a bedroom is in the east side of the house  
+  a bedroom is in the south east side of the house  
+  a bedroom is in the south side of the house  
+  a bedroom is in the south west side of the house  
+  a bedroom is in the west side of the house  
+  a bedroom is in the north west side of the house  
