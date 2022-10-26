@@ -34,8 +34,8 @@ def eval_function(samples, prompts, prompt_types):
             reward.append(type_reward)
         except:
             # what type of values should we put when the model fails to create a valid design?
-            semantic_accuracy.append(-999)
-            reward.append(-999)
+            semantic_accuracy.append(-1)
+            reward.append(-1)
 
     results = {'semantic_accuracy': semantic_accuracy, 'reward': reward}
     #results.append((semantic_accuracy, type_reward))
