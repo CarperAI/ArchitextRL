@@ -1,0 +1,7 @@
+git+https://github.com/CarperAI/OpenELM.git
+torch
+shapely
+numpy
+networkx
+transformers
+hydra-core>=1.2.0
