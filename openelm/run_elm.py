@@ -57,7 +57,7 @@ class ArchitextELM:
 
 # Load hydra config from yaml files and command line arguments.
 @hydra.main(
-    config_path="", config_name="architext_cfg", version_base="1.2"
+    config_path="config", config_name="architext_cfg", version_base="1.2"
 )
 def main(cfg):
     print("----------------- Config ---------------")
