@@ -46,8 +46,6 @@ class ArchitextPromptMutation(Model):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(self.cfg.model, use_auth_token=self.token)
-        self.tokenizer.padding_side = "left"
-        self.tokenizer.pad_token = self.cfg.pad_token
         self.model = AutoModelForCausalLM.from_pretrained(self.cfg.model, use_auth_token=self.token).to(self.device)
 
     def __call__(self, prompt, **kwargs):
@@ -56,6 +54,7 @@ class ArchitextPromptMutation(Model):
         output = self.model.generate(**self.tokenizer(prompt, **config).to(self.device),
                                      num_return_sequences=self.batch_size,
                                      max_length=self.cfg.gen_max_len,
+                                     pad_token_id=50256,
                                      **kwargs)
 
         return self.tokenizer.batch_decode(output)
