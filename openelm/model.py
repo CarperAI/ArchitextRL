@@ -46,12 +46,20 @@ class ArchitextPromptMutation(Model):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(self.cfg.model, use_auth_token=self.token)
-        self.model = AutoModelForCausalLM.from_pretrained(self.cfg.model, use_auth_token=self.token).to(self.device)
+        if self.cfg.gpus > 1:
+            self.model = torch.nn.DataParallel(
+                AutoModelForCausalLM.from_pretrained(self.cfg.model, use_auth_token=self.token),
+                device_ids=list(range(self.cfg.gpus))
+            ).to(self.device)
+        else:
+            self.model = AutoModelForCausalLM.from_pretrained(self.cfg.model,
+                                                              use_auth_token=self.token).to(self.device)
 
     def __call__(self, prompt, **kwargs):
         config = {'return_tensors': 'pt'}
 
         output = self.model.generate(**self.tokenizer(prompt, **config).to(self.device),
+                                     num_beams=self.batch_size,
                                      num_return_sequences=self.batch_size,
                                      max_length=self.cfg.gen_max_len,
                                      pad_token_id=50256,

@@ -1,15 +1,16 @@
+from collections import defaultdict
+
 import hydra
+import pickle
 from omegaconf import OmegaConf
-
 from elm.map_elites import MAPElites
-
 from architext_env import Architext, architext_init_args
 
 ENVS_DICT = {"architext": Architext}
 ARG_DICT = {"architext": architext_init_args}
 
 
-class ELM:
+class ArchitextELM:
     def __init__(self, cfg, diff_model_cls=None, env_args: dict = None) -> None:
         """
         Args:
@@ -38,10 +39,20 @@ class ELM:
             history_length=self.cfg.evo_history_length,
         )
 
-    def run(self) -> str:
-        return self.map_elites.search(
-            initsteps=self.cfg.evo_init_steps, totalsteps=self.cfg.evo_n_steps
-        )
+    def run(self):
+        histories = defaultdict(list)
+        for i in range(self.cfg.epoch):
+            self.map_elites.search(
+                initsteps=self.cfg.evo_init_steps, totalsteps=self.cfg.evo_n_steps
+            )
+            # Histories are reset every time when `.search` is called. We have to dump and merge it.
+            for key, val in self.map_elites.history.items():
+                histories[key].extend(val.copy())
+
+            with open(f'history.pkl', 'wb') as f:
+                pickle.dump(histories, f)
+            with open(f'map.pkl', 'wb') as f:
+                pickle.dump(self.map_elites.genomes, f)
 
 
 # Load hydra config from yaml files and command line arguments.
@@ -52,8 +63,8 @@ def main(cfg):
     print("----------------- Config ---------------")
     print(OmegaConf.to_yaml(cfg))
     print("-----------------  End -----------------")
-    elm = ELM(cfg)
-    print("Best Layout: ", elm.run())
+    elm = ArchitextELM(cfg)
+    elm.run()
 
 
 if __name__ == "__main__":

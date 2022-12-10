@@ -63,7 +63,6 @@ class Architext(BaseEnvironment):
         else:
             with open('../prompts.txt', 'r') as f:
                 prompts = [p.strip() for p in f.read().split('\n') if p.strip()]
-            #prompts = np.loadtxt('../prompts.txt', dtype=str, delimiter='\n')
             self.prompts = ['[prompt] ' + prompt.rstrip() + ' [layout]' for prompt in prompts]
 
         # Use RNG to rotate random seeds during inference.
@@ -79,29 +78,39 @@ class Architext(BaseEnvironment):
         """
         Sample layouts from the model by randomly selecting prompts.
         Returns:
-            the generated layout in a string representation.
+            the generated layouts as a list of ArchitextGenotype.
         """
         return self._get_layout(None, parent=None)
 
     def mutate(self, x: ArchitextGenotype) -> List[ArchitextGenotype]:
+        """
+        Mutate layouts from a given Architext design.
+        Args:
+            x: the given Architext design.
+
+        Returns:
+            the generated layout as a list of ArchitextGenotype.
+        """
         return self._get_layout(x.layout, parent=x)
 
-    def fitness(self, x: ArchitextGenotype) -> float:
+    @staticmethod
+    def fitness(x: ArchitextGenotype) -> float:
         if x.valid:
             return x.hlff()
         else:
             return -np.inf
 
-    def to_behavior_space(self, x: ArchitextGenotype) -> Phenotype:
+    @staticmethod
+    def to_behavior_space(x: ArchitextGenotype) -> Phenotype:
         if not x.valid:
             return None
-
         try:
             return np.array([x.gfa_entropy(), x.gfa()])
         except:
             return None
 
-    def to_string(self, x: ArchitextGenotype) -> str:
+    @staticmethod
+    def to_string(x: ArchitextGenotype) -> str:
         return str(x)
 
     def _get_layout(self, full_prompt, parent: Optional[ArchitextGenotype]) -> list[ArchitextGenotype]:
@@ -126,7 +135,7 @@ class Architext(BaseEnvironment):
         return 0
 
     @property
-    # [starts, endings) of search intervals
+    # [start, end) of search intervals
     def behavior_space(self):
         return self.genotype_space
 
