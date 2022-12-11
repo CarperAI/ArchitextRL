@@ -51,6 +51,7 @@ class ArchitextPromptMutation(Model):
                 AutoModelForCausalLM.from_pretrained(self.cfg.model, use_auth_token=self.token),
                 device_ids=list(range(self.cfg.gpus))
             ).to(self.device)
+            self.model.generate = self.model.module.generate
         else:
             self.model = AutoModelForCausalLM.from_pretrained(self.cfg.model,
                                                               use_auth_token=self.token).to(self.device)
