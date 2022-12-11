@@ -39,8 +39,23 @@ class ArchitextELM:
             history_length=self.cfg.evo_history_length,
         )
 
-    def run(self):
+    def run(self, evo_init_step_scheduler=None):
+        """
+        Run MAPElites for self.cfg.epoch number of times. Can optionally add in an initial step scheduler
+        to determine how many random steps are needed for each epoch.
+
+        Args:
+            evo_init_step_scheduler: (Optional) the scheduler function that takes in integers 1 ... epoch
+                and outputs the corresponding number of initial random steps in each epoch. Note that the
+                first epoch (indexed 0) will always perform `self.cfg.evo_init_step` random steps.
+                By default, this function is the zero function (no random steps for second epochs and further).
+
+        """
         histories = defaultdict(list)
+        if evo_init_step_scheduler is None:
+            def evo_init_step_scheduler(step: int):
+                return 0
+
         for i in range(self.cfg.epoch):
             self.map_elites.search(
                 initsteps=self.cfg.evo_init_steps, totalsteps=self.cfg.evo_n_steps
@@ -53,6 +68,8 @@ class ArchitextELM:
                 pickle.dump(histories, f)
             with open(f'map.pkl', 'wb') as f:
                 pickle.dump(self.map_elites.genomes, f)
+
+            self.cfg.evo_init_steps = evo_init_step_scheduler(i+1)
 
 
 # Load hydra config from yaml files and command line arguments.
