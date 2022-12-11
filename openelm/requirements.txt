@@ -5,3 +5,4 @@ numpy
 networkx
 transformers
 hydra-core>=1.2.0
+Pillow
