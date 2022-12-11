@@ -7,7 +7,7 @@ import numpy as np
 import torch as torch
 from omegaconf import DictConfig, OmegaConf
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from elm.codegen.codegen_utilities import model_setup, sample, set_seed, truncate
+from elm.codegen.codegen_utilities import set_seed
 from elm.diff_model import Model
 
 
@@ -43,9 +43,14 @@ class ArchitextPromptMutation(Model):
             self.token = os.environ['HF_TOKEN']
 
         self.batch_size = self.cfg.batch_size
+        self.device = torch.device("cuda" if torch.cuda.is_available() and self.cfg.cuda else "cpu")
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Set up the tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(self.cfg.model, use_auth_token=self.token)
+        self.tokenizer.padding_side = "left"
+        self.tokenizer.pad_token = self.cfg.pad_token
+
+        # Set up the model
         if self.cfg.gpus > 1:
             self.model = torch.nn.DataParallel(
                 AutoModelForCausalLM.from_pretrained(self.cfg.model, use_auth_token=self.token),
@@ -57,7 +62,8 @@ class ArchitextPromptMutation(Model):
                                                               use_auth_token=self.token).to(self.device)
 
     def __call__(self, prompt, **kwargs):
-        config = {'return_tensors': 'pt'}
+        config = {'return_tensors': 'pt',
+                  'padding': True}
 
         output = self.model.generate(**self.tokenizer(prompt, **config).to(self.device),
                                      num_beams=self.batch_size,
@@ -68,29 +74,38 @@ class ArchitextPromptMutation(Model):
 
         return self.tokenizer.batch_decode(output)
 
-    def generate_program(self, seed_str: Optional[str]) -> list[dict]:
+    def generate_program(self,
+                         seed_str: Optional[str],
+                         show_prompts: bool = False) -> list[dict]:
         """
         This class does not use codes as intermediate representation. To fit into the genotype format, we output
         a dict with `program_str` (== `result_obj`) being the string describing a floor plan using coordinates.
 
         Args:
             seed_str: the original prompt. If None, randomly choose a prompt from `self.prompts`.
+            show_prompts: (Optional) this is a test mechanics that dumps the first 2 prompts to stdout in every call.
         Returns:
             a list of completed prompts.
         """
         if seed_str is None:
             # Random generation
-            prompt = random.choice(self.prompts)
+            prompts = random.choices(self.prompts, k=self.batch_size)
         else:
             # Mutate the given string
             lines = seed_str.split(', ')
-            random_prompt = random.choice(self.prompts)
-            cut_off = np.random.randint(1, 3, size=1)[0]
-            cut_off = min(cut_off, len(lines) - 1)
-            prompt = random_prompt + ' ' + ', '.join(lines[1:cut_off + 1]) + ", " + random.choice(
-                self.room_labels) + ":"
+            prompts = []
+            for i in range(self.batch_size):
+                random_prompt = random.choice(self.prompts)
+                cut_off = np.random.randint(1, 3, size=1)[0]
+                cut_off = min(cut_off, len(lines) - 1)
+                prompts.append(random_prompt + ' ' + ', '.join(lines[1:cut_off + 1]) + ", " + random.choice(
+                    self.room_labels) + ":")
+
+        if show_prompts:
+            for i in range(min(2, self.batch_size)):
+                print(prompts[i])
 
         return [{'program_str': st,
                  'result_obj': st,
                  "error_code": 0
-                 } for st in self.__call__(prompt)]
+                 } for st in self.__call__(prompts)]

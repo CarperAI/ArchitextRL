@@ -36,6 +36,7 @@ class ArchitextELM:
         self.map_elites = MAPElites(
             self.environment,
             n_bins=self.cfg.behavior_n_bins,
+            save_history=True,
             history_length=self.cfg.evo_history_length,
         )
 
