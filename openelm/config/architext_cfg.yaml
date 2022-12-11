@@ -22,6 +22,8 @@ run_name: ???  # Mandatory string argument that describes the run.
 # Architext parameters
 height: 2.0
 epoch: 1
+num_generation: 2  # for every prompt, generate this many number of mutations
+
 
 ###################################################################################################
 # Hydra config overrides:

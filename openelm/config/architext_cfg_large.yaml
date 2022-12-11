@@ -8,10 +8,10 @@ fp16: False
 top_p: 0.95
 temp: 0.85
 timeout: 5.0  # Seconds
-gen_max_len: 500
-batch_size: 128
-evo_init_steps: 100
-evo_n_steps: 200
+gen_max_len: 400
+batch_size: 32
+evo_init_steps: 300
+evo_n_steps: 600
 behavior_n_bins: 12
 evo_history_length: 1000
 #evaluation_steps: 100
@@ -22,6 +22,7 @@ run_name: ???  # Mandatory string argument that describes the run.
 # Architext parameters
 height: 2.0
 epoch: 10  # run the search loop `epoch` amount of times
+num_generation: 32  # for every prompt, generate this many number of mutations
 
 ###################################################################################################
 # Hydra config overrides:

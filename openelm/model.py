@@ -66,8 +66,8 @@ class ArchitextPromptMutation(Model):
                   'padding': True}
 
         output = self.model.generate(**self.tokenizer(prompt, **config).to(self.device),
-                                     num_beams=self.batch_size,
-                                     num_return_sequences=self.batch_size,
+                                     num_beams=self.cfg.num_generation,
+                                     num_return_sequences=self.cfg.num_generation,
                                      max_length=self.cfg.gen_max_len,
                                      pad_token_id=50256,
                                      **kwargs)
