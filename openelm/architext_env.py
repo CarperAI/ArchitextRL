@@ -4,7 +4,7 @@ from omegaconf import DictConfig, OmegaConf
 from typing import List
 from architext_genotype import ArchitextGenotype
 from model import ArchitextPromptMutation
-from elm import diff_model
+from openelm import diff_model
 
 Phenotype = Optional[np.ndarray]
 
@@ -39,7 +39,7 @@ class Architext(BaseEnvironment):
     def __init__(self,
                  config: Union[str, dict, DictConfig],
                  prompts: Optional[list] = None,
-                 model: Optional[diff_model.Model] = None,
+                 model: Optional[diff_model.MutationModel] = None,
                  behavior_mode='hlff_and_fae'
                  ):
         """

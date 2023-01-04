@@ -3,7 +3,7 @@ from collections import defaultdict
 import hydra
 import pickle
 from omegaconf import OmegaConf
-from elm.map_elites import MAPElites
+from openelm.map_elites import MAPElites
 from architext_env import Architext, architext_init_args
 
 ENVS_DICT = {"architext": Architext}

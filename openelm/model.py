@@ -7,11 +7,11 @@ import numpy as np
 import torch as torch
 from omegaconf import DictConfig, OmegaConf
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from elm.codegen.codegen_utilities import set_seed
-from elm.diff_model import Model
+from openelm.codegen.codegen_utilities import set_seed
+from openelm.diff_model import MutationModel
 
 
-class ArchitextPromptMutation(Model):
+class ArchitextPromptMutation(MutationModel):
     """
     Generating hf outputs in the local machine.
     """
