@@ -2,13 +2,12 @@ from pathlib import Path
 import numpy as np
 import random
 import re
-import textwrap
 from shapely.geometry.polygon import Polygon
 
-from PIL import Image, ImageDraw, ImageOps, ImageFilter, ImageFont, ImageColor
+from PIL import Image, ImageDraw
 import gradio as gr
 from random import shuffle
-from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
 model_path = Path('path/to/architext/model')
 finetuned = AutoModelForCausalLM.from_pretrained(model_path)
@@ -158,7 +157,7 @@ def gen_and_mutate(user_prompt, mutate=False, mut_rate=0.2):
             except:
                 pass
     else:
-        mut_im=Image.open(r"C:\\Users\\user\\Desktop\\empty.png")
+        mut_im=Image.open("empty.png")
         im, _, _ = prompt_to_layout(user_prompt)
         
     return im, mut_im
