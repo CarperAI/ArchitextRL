@@ -119,3 +119,35 @@ def find_distance(seed_graph, target_graphs):
 housegan_labels = {"living_room": 1, "kitchen": 2, "bedroom": 3, "bathroom": 4, "missing": 5, "closet": 6,
                    "balcony": 7, "corridor": 8, "dining_room": 9, "laundry_room": 10}
 regex = re.compile(r".*?\((.*?)\)")
+
+pattern = re.compile(r"\[prompt\] +(.*) \[layout\] +(.*) +<|endoftext|>")
+rooms = re.compile(r"([^ ]+): +([^ ]+)")
+coords = re.compile(r"\((-?\d+),(-?\d+)\)")
+
+
+def string_to_dict(prompt_string: str) -> dict:
+    """
+    Turn a formatted design string into a dict
+    Args:
+        prompt_string: a formatted string including prompt and the collection of room represented as polygons.
+          e.g.,
+          "[prompt] a bedroom is adjacent to the kitchen [layout] bedroom1: (194,91)(135,91)(135,47)(194,47), "
+          "living_room: (121,194)(47,194)(47,91)(106,91)(106,106)(121,106), bathroom1: (179,121)(135,121)(135,91)"
+          "(179,91), bedroom2: (209,165)(135,165)(135,121)(209,121), bathroom2: (165,209)(135,209)(135,165)(165,165), "
+          "bedroom3: (121,238)(47,238)(47,194)(121,194), kitchen: (135,77)(106,77)(106,18)(135,18), corridor: "
+          "(121,209)(121,106)(106,106)(106,77)(135,77)(135,209) <|endoftext|>\n"
+
+    Returns:
+        a nested dict containing the prompt and the layout.
+    """
+    match = pattern.match(prompt_string[-1]).groups()
+    assert match is not None and len(match) >= 2
+    prompt = match[0]
+    layout = match[1]
+
+    design = {"prompt": prompt, "layout": {}}
+    for room in rooms.findall(layout):
+        design["layout"][room[0]] = [(x, y) for x, y in coords.findall(room[1])]
+
+    return design
+

@@ -3,10 +3,10 @@ from collections import defaultdict
 import hydra
 import pickle
 from omegaconf import OmegaConf
-from elm.map_elites import MAPElites
+from openelm.map_elites import MAPElites
 from architext_env import Architext, architext_init_args
+from openelm.environments import ENVS_DICT
 
-ENVS_DICT = {"architext": Architext}
 ARG_DICT = {"architext": architext_init_args}
 
 
@@ -35,7 +35,7 @@ class ArchitextELM:
         self.environment = ENVS_DICT[self.cfg.env_name](**env_args)
         self.map_elites = MAPElites(
             self.environment,
-            n_bins=self.cfg.behavior_n_bins,
+            map_grid_size=(self.cfg.behavior_n_bins,),
             save_history=True,
             history_length=self.cfg.evo_history_length,
         )
@@ -59,7 +59,7 @@ class ArchitextELM:
 
         for i in range(self.cfg.epoch):
             self.map_elites.search(
-                initsteps=self.cfg.evo_init_steps, totalsteps=self.cfg.evo_n_steps
+                init_steps=self.cfg.evo_init_steps, total_steps=self.cfg.evo_n_steps
             )
             # Histories are reset every time when `.search` is called. We have to dump and merge it.
             for key, val in self.map_elites.history.items():

@@ -4,9 +4,8 @@ from omegaconf import DictConfig, OmegaConf
 from typing import List
 from architext_genotype import ArchitextGenotype
 from model import ArchitextPromptMutation
-from elm import diff_model
-
-Phenotype = Optional[np.ndarray]
+from openelm.mutation_model import PromptModel
+from openelm.environments import ENVS_DICT
 
 architext_init_args = {"config": "architext_cfg.yaml",
                        "prompts": None}
@@ -39,7 +38,7 @@ class Architext(BaseEnvironment):
     def __init__(self,
                  config: Union[str, dict, DictConfig],
                  prompts: Optional[list] = None,
-                 model: Optional[diff_model.Model] = None,
+                 mutation_model: Optional[PromptModel] = None,
                  behavior_mode='hlff_and_fae'
                  ):
         """
@@ -72,7 +71,7 @@ class Architext(BaseEnvironment):
         self.genotype_ndim = self.behavior_mode_spec[self.behaviour_mode]['genotype_ndim']
         self.genotype_space = self.behavior_mode_spec[self.behaviour_mode]['genotype_space']
 
-        self.model = ArchitextPromptMutation(self.config, self.prompts) if model is None else model
+        self.model = ArchitextPromptMutation(self.config, self.prompts) if mutation_model is None else mutation_model
 
     def random(self) -> List[ArchitextGenotype]:
         """
@@ -101,15 +100,6 @@ class Architext(BaseEnvironment):
             return -np.inf
 
     @staticmethod
-    def to_behavior_space(x: ArchitextGenotype) -> Phenotype:
-        if not x.valid:
-            return None
-        try:
-            return np.array([x.gfa_entropy(), x.gfa()])
-        except:
-            return None
-
-    @staticmethod
     def to_string(x: ArchitextGenotype) -> str:
         return str(x)
 
@@ -118,7 +108,7 @@ class Architext(BaseEnvironment):
                                   layout=elem['result_obj'],
                                   height=self.config.height,
                                   parent=parent) for elem in
-                self.model.generate_program(full_prompt)]
+                self.model.generate_programs(full_prompt)]
 
     @staticmethod
     def _has_valid_output(x: ArchitextGenotype) -> bool:
@@ -142,3 +132,6 @@ class Architext(BaseEnvironment):
     @property
     def behavior_ndim(self):
         return self.behavior_space.shape[1]
+
+
+ENVS_DICT['architext'] = Architext

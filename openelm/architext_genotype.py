@@ -8,11 +8,9 @@ from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
 from util import get_value, find_intersections, get_key, calc_entropy, draw_polygons, housegan_labels, regex
+from openelm.environments import Genotype
 
-
-# TODO: remove when OpenELM exposes Genotype
-class Genotype:
-    pass
+Phenotype = Optional[np.ndarray]
 
 
 class ArchitextGenotype(Genotype):
@@ -38,6 +36,14 @@ class ArchitextGenotype(Genotype):
         self.valid = self.validate()
 
         self.parent = parent
+
+    def to_phenotype(self) -> Phenotype:
+        if not self.valid:
+            return None
+        try:
+            return np.array([self.gfa_entropy(), self.gfa()])
+        except:
+            return None
 
     def get_clean_layout(self) -> list[str]:
         if len(self.layout.split('[layout]')) > 1:

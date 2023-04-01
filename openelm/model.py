@@ -7,11 +7,11 @@ import numpy as np
 import torch as torch
 from omegaconf import DictConfig, OmegaConf
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from elm.codegen.codegen_utilities import set_seed
-from elm.diff_model import Model
+from openelm.codegen.codegen_utilities import set_seed
+from openelm.mutation_model import PromptModel
 
 
-class ArchitextPromptMutation(Model):
+class ArchitextPromptMutation(PromptModel):
     """
     Generating hf outputs in the local machine.
     """
@@ -74,7 +74,7 @@ class ArchitextPromptMutation(Model):
 
         return self.tokenizer.batch_decode(output)
 
-    def generate_program(self,
+    def generate_programs(self,
                          seed_str: Optional[str],
                          show_prompts: bool = False) -> list[dict]:
         """
