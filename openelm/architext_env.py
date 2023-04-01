@@ -7,6 +7,7 @@ from model import ArchitextPromptMutation
 from openelm.mutation_model import PromptModel
 from openelm.environments import ENVS_DICT
 
+
 architext_init_args = {"config": "architext_cfg.yaml",
                        "prompts": None}
 
