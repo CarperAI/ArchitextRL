@@ -7,7 +7,7 @@ from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
 from enum import Enum
-from .util import calc_entropy, draw_polygons
+from util import calc_entropy, draw_polygons
 from openelm.environments import Genotype
 
 Phenotype = Optional[np.ndarray]
