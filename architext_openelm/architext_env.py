@@ -105,8 +105,7 @@ class Architext(BaseEnvironment):
         return str(x)
 
     def _get_layout(self, full_prompt, parent: Optional[ArchitextGenotype]) -> list[ArchitextGenotype]:
-        return [ArchitextGenotype(code=elem['program_str'],
-                                  layout=elem['result_obj'],
+        return [ArchitextGenotype(design_string=elem['result_obj'],
                                   height=self.config.height,
                                   parent=parent) for elem in
                 self.model.generate_programs(full_prompt)]

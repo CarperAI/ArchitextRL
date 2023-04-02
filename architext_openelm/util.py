@@ -2,7 +2,7 @@ import os
 import random
 import numpy as np
 from abc import ABC
-from math import log, e
+import math
 import re
 from omegaconf import DictConfig, OmegaConf
 from shapely.geometry.polygon import Polygon
@@ -30,14 +30,15 @@ def draw_polygons(polygons, colors, im_size=(256, 256), b_color="white", fpath=N
             for coord in mycoordslist:
                 coords = np.dstack((np.array(coord)[:, 1], np.array(coord)[:, 0])).flatten()
                 draw.polygon(list(coords), fill=tuple(color))
-        elif poly.geom_type == 'Polygon':
+        elif small_poly.geom_type == 'Polygon':
             # get inner polygon coordinates
-            xy2 = small_poly.exterior.xy
-            coords2 = np.dstack((xy2[1], xy2[0])).flatten()
-            # draw it on canvas, with the appropriate colors
-            draw.polygon(list(coords2), fill=tuple(color))
+            if not small_poly.is_empty:
+                xy2 = small_poly.exterior.xy
+                coords2 = np.dstack((xy2[1], xy2[0])).flatten()
+                # draw it on canvas, with the appropriate colors
+                draw.polygon(list(coords2), fill=tuple(color))
 
-            # image = image.transpose(Image.FLIP_TOP_BOTTOM)
+                # image = image.transpose(Image.FLIP_TOP_BOTTOM)
 
     if (fpath):
         image.save(fpath, format='png', quality=100, subsampling=0)
@@ -56,11 +57,9 @@ def calc_entropy(labels, base=None):
     n_classes = np.count_nonzero(probs)
     if n_classes <= 1:
         return 0
-    ent = 0.
     # Compute entropy
-    base = e if base is None else base
-    for i in probs:
-        ent -= i * log(i, base)
+    base = math.e if base is None else base
+    ent = -sum(i * math.log(i, base) for i in probs)
 
     return ent
 
@@ -120,34 +119,4 @@ housegan_labels = {"living_room": 1, "kitchen": 2, "bedroom": 3, "bathroom": 4, 
                    "balcony": 7, "corridor": 8, "dining_room": 9, "laundry_room": 10}
 regex = re.compile(r".*?\((.*?)\)")
 
-pattern = re.compile(r"\[prompt\] +(.*) \[layout\] +(.*) +<|endoftext|>")
-rooms = re.compile(r"([^ ]+): +([^ ]+)")
-coords = re.compile(r"\((-?\d+),(-?\d+)\)")
-
-
-def string_to_dict(prompt_string: str) -> dict:
-    """
-    Turn a formatted design string into a dict
-    Args:
-        prompt_string: a formatted string including prompt and the collection of room represented as polygons.
-          e.g.,
-          "[prompt] a bedroom is adjacent to the kitchen [layout] bedroom1: (194,91)(135,91)(135,47)(194,47), "
-          "living_room: (121,194)(47,194)(47,91)(106,91)(106,106)(121,106), bathroom1: (179,121)(135,121)(135,91)"
-          "(179,91), bedroom2: (209,165)(135,165)(135,121)(209,121), bathroom2: (165,209)(135,209)(135,165)(165,165), "
-          "bedroom3: (121,238)(47,238)(47,194)(121,194), kitchen: (135,77)(106,77)(106,18)(135,18), corridor: "
-          "(121,209)(121,106)(106,106)(106,77)(135,77)(135,209) <|endoftext|>\n"
-
-    Returns:
-        a nested dict containing the prompt and the layout.
-    """
-    match = pattern.match(prompt_string[-1]).groups()
-    assert match is not None and len(match) >= 2
-    prompt = match[0]
-    layout = match[1]
-
-    design = {"prompt": prompt, "layout": {}}
-    for room in rooms.findall(layout):
-        design["layout"][room[0]] = [(x, y) for x, y in coords.findall(room[1])]
-
-    return design
 
