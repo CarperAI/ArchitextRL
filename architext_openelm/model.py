@@ -89,7 +89,7 @@ class ArchitextPromptMutation(PromptModel):
             prompts.append(mutated_prompt)
 
         completion = self.model.generate(**self.tokenizer(prompts,
-                                                          return_tensor="pt",
+                                                          return_tensors="pt",
                                                           padding=True,
                                                           truncation=True).to(self.device),
                                          num_beams=self.cfg.num_generation,
