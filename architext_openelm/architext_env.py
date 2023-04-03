@@ -57,6 +57,7 @@ class Architext(BaseEnvironment):
             self.config = DictConfig(config)
         else:
             raise ValueError
+        self.batch_size = self.config.batch_size
 
         if prompts is not None:
             self.prompts = prompts
@@ -80,9 +81,10 @@ class Architext(BaseEnvironment):
         Returns:
             the generated layouts as a list of ArchitextGenotype.
         """
-        return self._get_layout([{"prompt": None}], parent=None)
+        return self._get_layout([{"prompt": None} for _ in range(self.batch_size)],
+                                parents=[None] * self.batch_size)
 
-    def mutate(self, x: ArchitextGenotype) -> List[ArchitextGenotype]:
+    def mutate(self, x: list[ArchitextGenotype]) -> List[ArchitextGenotype]:
         """
         Mutate layouts from a given Architext design.
         Args:
@@ -91,7 +93,7 @@ class Architext(BaseEnvironment):
         Returns:
             the generated layout as a list of ArchitextGenotype.
         """
-        return self._get_layout([{"prompt": x.to_design_string()}], parent=x)
+        return self._get_layout([{"prompt": elem.to_design_string()} for elem in x], parents=x)
 
     @staticmethod
     def fitness(x: ArchitextGenotype) -> float:
@@ -104,11 +106,11 @@ class Architext(BaseEnvironment):
     def to_string(x: ArchitextGenotype) -> str:
         return str(x)
 
-    def _get_layout(self, prompt_dicts, parent: Optional[ArchitextGenotype]) -> list[ArchitextGenotype]:
+    def _get_layout(self, prompt_dicts, parents: list[Optional[ArchitextGenotype]]) -> list[ArchitextGenotype]:
         return [ArchitextGenotype(design_string=elem,
                                   height=self.config.height,
-                                  parent=parent) for elem in
-                self.model.generate_programs(prompt_dicts)]
+                                  parent=parent) for elem, parent in
+                zip(self.model.generate_programs(prompt_dicts), parents)]
 
     @staticmethod
     def _has_valid_output(x: ArchitextGenotype) -> bool:
