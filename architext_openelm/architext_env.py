@@ -4,9 +4,9 @@ from omegaconf import DictConfig, OmegaConf
 from typing import List
 from architext_genotype import ArchitextGenotype
 from model import ArchitextPromptMutation
-from openelm import diff_model
+from openelm.mutation_model import PromptModel
+from openelm.environments import ENVS_DICT
 
-Phenotype = Optional[np.ndarray]
 
 architext_init_args = {"config": "architext_cfg.yaml",
                        "prompts": None}
@@ -39,7 +39,7 @@ class Architext(BaseEnvironment):
     def __init__(self,
                  config: Union[str, dict, DictConfig],
                  prompts: Optional[list] = None,
-                 model: Optional[diff_model.MutationModel] = None,
+                 mutation_model: Optional[PromptModel] = None,
                  behavior_mode='hlff_and_fae'
                  ):
         """
@@ -57,6 +57,7 @@ class Architext(BaseEnvironment):
             self.config = DictConfig(config)
         else:
             raise ValueError
+        self.batch_size = self.config.batch_size
 
         if prompts is not None:
             self.prompts = prompts
@@ -72,7 +73,7 @@ class Architext(BaseEnvironment):
         self.genotype_ndim = self.behavior_mode_spec[self.behaviour_mode]['genotype_ndim']
         self.genotype_space = self.behavior_mode_spec[self.behaviour_mode]['genotype_space']
 
-        self.model = ArchitextPromptMutation(self.config, self.prompts) if model is None else model
+        self.model = ArchitextPromptMutation(self.config, self.prompts) if mutation_model is None else mutation_model
 
     def random(self) -> List[ArchitextGenotype]:
         """
@@ -80,9 +81,10 @@ class Architext(BaseEnvironment):
         Returns:
             the generated layouts as a list of ArchitextGenotype.
         """
-        return self._get_layout(None, parent=None)
+        return self._get_layout([{"prompt": None} for _ in range(self.batch_size)],
+                                parents=[None] * self.batch_size)
 
-    def mutate(self, x: ArchitextGenotype) -> List[ArchitextGenotype]:
+    def mutate(self, x: list[ArchitextGenotype]) -> List[ArchitextGenotype]:
         """
         Mutate layouts from a given Architext design.
         Args:
@@ -91,7 +93,7 @@ class Architext(BaseEnvironment):
         Returns:
             the generated layout as a list of ArchitextGenotype.
         """
-        return self._get_layout(x.layout, parent=x)
+        return self._get_layout([{"prompt": elem.to_design_string()} for elem in x], parents=x)
 
     @staticmethod
     def fitness(x: ArchitextGenotype) -> float:
@@ -101,24 +103,14 @@ class Architext(BaseEnvironment):
             return -np.inf
 
     @staticmethod
-    def to_behavior_space(x: ArchitextGenotype) -> Phenotype:
-        if not x.valid:
-            return None
-        try:
-            return np.array([x.gfa_entropy(), x.gfa()])
-        except:
-            return None
-
-    @staticmethod
     def to_string(x: ArchitextGenotype) -> str:
         return str(x)
 
-    def _get_layout(self, full_prompt, parent: Optional[ArchitextGenotype]) -> list[ArchitextGenotype]:
-        return [ArchitextGenotype(code=elem['program_str'],
-                                  layout=elem['result_obj'],
+    def _get_layout(self, prompt_dicts, parents: list[Optional[ArchitextGenotype]]) -> list[ArchitextGenotype]:
+        return [ArchitextGenotype(design_string=elem,
                                   height=self.config.height,
-                                  parent=parent) for elem in
-                self.model.generate_program(full_prompt)]
+                                  parent=parent) for elem, parent in
+                zip(self.model.generate_programs(prompt_dicts), parents)]
 
     @staticmethod
     def _has_valid_output(x: ArchitextGenotype) -> bool:
@@ -142,3 +134,6 @@ class Architext(BaseEnvironment):
     @property
     def behavior_ndim(self):
         return self.behavior_space.shape[1]
+
+
+ENVS_DICT['architext'] = Architext

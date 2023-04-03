@@ -8,12 +8,12 @@ import torch as torch
 from omegaconf import DictConfig, OmegaConf
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from openelm.codegen.codegen_utilities import set_seed
-from openelm.diff_model import MutationModel
+from openelm.mutation_model import PromptModel
 
 
-class ArchitextPromptMutation(MutationModel):
+class ArchitextPromptMutation(PromptModel):
     """
-    Generating hf outputs in the local machine.
+    Generating hf outputs on the local machine.
     """
 
     room_labels = ['bedroom1', 'kitchen', 'living_room', 'corridor', 'bathroom1']
@@ -51,6 +51,7 @@ class ArchitextPromptMutation(MutationModel):
         self.tokenizer.pad_token = self.cfg.pad_token
 
         # Set up the model
+        # TODO: fix data parallel
         if self.cfg.gpus > 1:
             self.model = torch.nn.DataParallel(
                 AutoModelForCausalLM.from_pretrained(self.cfg.model, use_auth_token=self.token),
@@ -61,51 +62,46 @@ class ArchitextPromptMutation(MutationModel):
             self.model = AutoModelForCausalLM.from_pretrained(self.cfg.model,
                                                               use_auth_token=self.token).to(self.device)
 
-    def __call__(self, prompt, **kwargs):
-        config = {'return_tensors': 'pt',
-                  'padding': True}
-
-        output = self.model.generate(**self.tokenizer(prompt, **config).to(self.device),
-                                     num_beams=self.cfg.num_generation,
-                                     num_return_sequences=self.cfg.num_generation,
-                                     max_length=self.cfg.gen_max_len,
-                                     pad_token_id=50256,
-                                     **kwargs)
-
-        return self.tokenizer.batch_decode(output)
-
-    def generate_program(self,
-                         seed_str: Optional[str],
-                         show_prompts: bool = False) -> list[dict]:
+    def generate_programs(self, prompt_dicts: list[dict[str, str]], **kwargs) -> list[str]:
         """
         This class does not use codes as intermediate representation. To fit into the genotype format, we output
         a dict with `program_str` (== `result_obj`) being the string describing a floor plan using coordinates.
 
         Args:
-            seed_str: the original prompt. If None, randomly choose a prompt from `self.prompts`.
-            show_prompts: (Optional) this is a test mechanics that dumps the first 2 prompts to stdout in every call.
+            prompt_dicts: in this special case, prompt_dicts = [{'prompt': prompt_str1}, {'prompt': prompt_str2}, ...]
         Returns:
-            a list of completed prompts.
+            a list of mutated prompts.
         """
-        if seed_str is None:
-            # Random generation
-            prompts = random.choices(self.prompts, k=self.batch_size)
-        else:
-            # Mutate the given string
-            lines = seed_str.split(', ')
-            prompts = []
-            for i in range(self.batch_size):
+        prompts = []
+        for pd in prompt_dicts:
+            prompt_str = pd["prompt"]
+            if prompt_str is None:
+                # Random generation
+                mutated_prompt = random.choice(self.prompts)
+            else:
+                # Mutate the given string
+                lines = prompt_str.split(', ')
                 random_prompt = random.choice(self.prompts)
                 cut_off = np.random.randint(1, 3, size=1)[0]
                 cut_off = min(cut_off, len(lines) - 1)
-                prompts.append(random_prompt + ' ' + ', '.join(lines[1:cut_off + 1]) + ", " + random.choice(
-                    self.room_labels) + ":")
+                mutated_prompt = random_prompt + ' ' + ', '.join(lines[1:cut_off + 1]) + ", " + random.choice(
+                    self.room_labels) + ":"
+            prompts.append(mutated_prompt)
 
-        if show_prompts:
-            for i in range(min(2, self.batch_size)):
-                print(prompts[i])
+        completion = self.model.generate(**self.tokenizer(prompts,
+                                                          return_tensors="pt",
+                                                          padding=True,
+                                                          truncation=True).to(self.device),
+                                         num_beams=self.cfg.num_generation,
+                                         num_return_sequences=self.cfg.num_generation,
+                                         max_length=self.cfg.gen_max_len,
+                                         pad_token_id=50256,
+                                         **kwargs)
 
-        return [{'program_str': st,
-                 'result_obj': st,
-                 "error_code": 0
-                 } for st in self.__call__(prompts)]
+        return self.tokenizer.batch_decode(completion)
+
+
+class ArchitextChatGPTMutation(PromptModel):
+    """
+    This prompt mutation calls GPT-3.5 API to generate designs
+    """
