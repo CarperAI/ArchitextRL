@@ -62,7 +62,7 @@ class ArchitextPromptMutation(PromptModel):
             self.model = AutoModelForCausalLM.from_pretrained(self.cfg.model,
                                                               use_auth_token=self.token).to(self.device)
 
-    def generate_programs(self, prompt_dicts: list[dict[str, str]], **kwargs) -> list[dict]:
+    def generate_programs(self, prompt_dicts: list[dict[str, str]], **kwargs) -> list[str]:
         """
         This class does not use codes as intermediate representation. To fit into the genotype format, we output
         a dict with `program_str` (== `result_obj`) being the string describing a floor plan using coordinates.
