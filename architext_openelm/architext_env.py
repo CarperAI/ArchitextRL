@@ -80,7 +80,7 @@ class Architext(BaseEnvironment):
         Returns:
             the generated layouts as a list of ArchitextGenotype.
         """
-        return self._get_layout(None, parent=None)
+        return self._get_layout([{"prompt": None}], parent=None)
 
     def mutate(self, x: ArchitextGenotype) -> List[ArchitextGenotype]:
         """
@@ -91,7 +91,7 @@ class Architext(BaseEnvironment):
         Returns:
             the generated layout as a list of ArchitextGenotype.
         """
-        return self._get_layout(x.layout, parent=x)
+        return self._get_layout([{"prompt": x.to_design_string()}], parent=x)
 
     @staticmethod
     def fitness(x: ArchitextGenotype) -> float:
