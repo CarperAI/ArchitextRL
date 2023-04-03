@@ -77,7 +77,7 @@ class ArchitextPromptMutation(PromptModel):
             prompt_str = pd["prompt"]
             if prompt_str is None:
                 # Random generation
-                mutated_prompt = random.choices(self.prompts)
+                mutated_prompt = random.choice(self.prompts)
             else:
                 # Mutate the given string
                 lines = prompt_str.split(', ')

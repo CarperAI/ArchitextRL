@@ -104,11 +104,11 @@ class Architext(BaseEnvironment):
     def to_string(x: ArchitextGenotype) -> str:
         return str(x)
 
-    def _get_layout(self, full_prompt, parent: Optional[ArchitextGenotype]) -> list[ArchitextGenotype]:
+    def _get_layout(self, prompt_dicts, parent: Optional[ArchitextGenotype]) -> list[ArchitextGenotype]:
         return [ArchitextGenotype(design_string=elem['result_obj'],
                                   height=self.config.height,
                                   parent=parent) for elem in
-                self.model.generate_programs(full_prompt)]
+                self.model.generate_programs(prompt_dicts)]
 
     @staticmethod
     def _has_valid_output(x: ArchitextGenotype) -> bool:
