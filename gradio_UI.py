@@ -9,6 +9,8 @@ import gradio as gr
 from random import shuffle
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
+# if HF download does not work, you can download the model from here: https://huggingface.co/architext/gptj-162M/blob/main/pytorch_model.bin 
+# and then link to its local path below 
 model_path = Path('path/to/architext/model')
 finetuned = AutoModelForCausalLM.from_pretrained(model_path)
 tokenizer = AutoTokenizer.from_pretrained('EleutherAI/gpt-j-6B')
