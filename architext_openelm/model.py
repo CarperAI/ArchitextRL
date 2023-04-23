@@ -18,7 +18,7 @@ from openelm.mutation_model import PromptModel
 from architext_genotype import ArchitextGenotype
 from concurrent.futures import ThreadPoolExecutor
 
-max_json = re.compile(r"\{.*\}")
+max_json = re.compile(r"\{[\d\D]*\}")
 
 
 class ArchitextPromptMutation(PromptModel):
@@ -171,14 +171,19 @@ class ArchitextChatGPTMutation(PromptModel):
                 assert isinstance(x, str)
                 try:
                     new_dict = max_json.match(x).group(0)
-                    print(new_dict)
-                    assert new_dict
+                    new_dict = ast.literal_eval(new_dict)
                     mutated_genotypes.append(
                         ArchitextGenotype.from_dict(new_dict,
                                                     height=self.default_height if parent is None else parent.height,
                                                     parent=parent)
                     )
-                except:
+                except Exception as e:
+                    with open("logs.txt", "a") as f:
+                        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        f.write(f"[{timestamp} ERROR]: Parsing error in the return of GPT-3.5.\n"
+                                f"Returned string: {str(x)}\n"
+                                f"Exception: {str(e)}\n"
+                                )
                     mutated_genotypes.append(None)
 
         return mutated_genotypes
