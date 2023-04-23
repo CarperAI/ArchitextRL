@@ -47,6 +47,9 @@ class ArchitextGenotype(Genotype):
         self.parse_design()
 
         self.parent = parent
+
+        # 1B1B, 2B1B, 2B2B, 3B1B, 3B2B, 3B3B, 4B1B, 4B2B, 4B3B, 4B4B, numbered consecutively
+        # label -> typology
         self.typologies_to = {
             num: typ
             for num, typ in enumerate(
@@ -54,7 +57,8 @@ class ArchitextGenotype(Genotype):
                     (i + 1, j + 1) for j in range(4) for i in range(4)
                     if j <= i
                 ]
-            )}  # 1B1B, 2B1B, 2B2B, 3B1B, 3B2B, 3B3B, 4B1B, 4B2B, 4B3B, 4B4B
+            )}
+        # typology -> label
         self.typologies_from = {typ: num for num, typ in self.typologies_to.items()}
 
     @classmethod
@@ -67,8 +71,8 @@ class ArchitextGenotype(Genotype):
             return None
         else:
             gfa_entropy = self.design_json["metrics"]["gfa_entropy"]
-            if self.typology() in self.typologies_to:
-                typ = self.typologies_to[self.typology()]
+            if self.typology() in self.typologies_from:
+                typ = self.typologies_from[self.typology()]
             else:
                 return None
             return np.array([gfa_entropy, typ])

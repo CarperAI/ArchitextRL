@@ -1,5 +1,5 @@
-evo_init_steps: 10
-evo_n_steps: 15
+evo_init_steps: 1
+evo_n_steps: 2
 
 behavior_n_bins: 10
 evo_history_length: 10

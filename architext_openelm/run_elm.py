@@ -65,8 +65,8 @@ class ArchitextELM:
             for key, val in self.map_elites.history.items():
                 histories[key].extend(val.copy())
 
-            with open(f'history.pkl', 'wb') as f:
-                pickle.dump(histories, f)
+            with open(f'recycled.pkl', 'wb') as f:
+                pickle.dump(self.map_elites.recycled, f)
             with open(f'map.pkl', 'wb') as f:
                 pickle.dump(self.map_elites.genomes, f)
 

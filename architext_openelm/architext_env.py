@@ -31,7 +31,7 @@ class Architext(BaseEnvironment):
                                            'genotype_space': np.array([[0.5, 5.5], [0, 2000]]).T
                                            },
                           'entropy_and_typology': {'genotype_ndim': 2,
-                                                   'genotype_space': np.array([[0, 5], [0, 12]]).T
+                                                   'genotype_space': np.array([[0, 5], [0, 10]]).T
                                                    }
                           }
 

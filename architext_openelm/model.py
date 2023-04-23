@@ -185,7 +185,7 @@ class ArchitextChatGPTMutation(PromptModel):
                                 f"Exception: {str(e)}\n"
                                 )
                     mutated_genotypes.append(None)
-
+        print(mutated_genotypes)
         return mutated_genotypes
 
     @staticmethod
@@ -203,14 +203,15 @@ class ArchitextChatGPTMutation(PromptModel):
                        "3. The room names should be one of 'living_room', ''kitchen', 'bedroom', 'bathroom', " \
                        "'corridor', followed by potentially a number if there are multiple of the same kind.\n" \
                        "4. There are no more than 4 bedrooms.\n" \
-                       "5. The number of bathrooms is no more than the number of bedrooms."
+                       "5. The number of bathrooms is no more than the number of bedrooms.\n" \
+                       "6. Return the full JSON document without any extra words.\n"
         prompt = "```\n" + str(example) + "\n```\n" + \
                  "The above JSON document describes a prompt and a floor plan. " \
                  "Each room is represented as a list of coordinates defining a polygon. " \
                  "Please follow the format of the given JSON document and generate a design " \
                  "where the prompt field is the following:\n" + \
                  "`" + prompt + "`\n\n" + \
-                 "The following are the requirements for the design:\n" + requirements
+                 "The following are the requirements:\n" + requirements
         for i in range(5):
             try:
                 completion = openai.ChatCompletion.create(

@@ -1,13 +1,14 @@
 import gradio as gr
 import pickle
 
+
 def on_click(path):
     m = pickle.load(open(path, "rb"))
     dims = m.dims
     result = []
     for i in range(dims[0]):
         for j in range(dims[1]):
-            result.append(map[i, j].get_random_genome())
+            result.append(m[i, j])
 
 
 with gr.Blocks() as demo:
