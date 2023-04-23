@@ -11,11 +11,11 @@ ARG_DICT = {"architext": architext_init_args}
 
 
 class ArchitextELM:
-    def __init__(self, cfg, diff_model_cls=None, env_args: dict = None) -> None:
+    def __init__(self, cfg, model_cls=None, env_args: dict = None) -> None:
         """
         Args:
             cfg: the config (e.g. OmegaConf who uses dot to access members).
-            diff_model_cls: (Optional) The class of diff model. One can apply alternative models here for comparison.
+            model_cls: (Optional) The class of diff model. One can apply alternative models here for comparison.
             env_args: (Optional) The argument dict for Environment.
         """
         self.cfg = cfg
@@ -25,12 +25,12 @@ class ArchitextELM:
             env_args = ARG_DICT[self.cfg.env_name]
         env_args["config"] = self.cfg  # Override default environment config
 
-        # Override diff model if `diff_model_cls` is specified.
-        if diff_model_cls is not None:
-            self.diff_model = diff_model_cls(self.cfg)
-            env_args = {**env_args, "diff_model": self.diff_model}
+        # Override diff model if `model_cls` is specified.
+        if model_cls is not None:
+            self.mutate_model = model_cls(self.cfg)
+            env_args = {**env_args, "mutation_model": self.mutate_model}
         else:
-            self.diff_model = None
+            self.mutate_model = None
 
         self.environment = ENVS_DICT[self.cfg.env_name](**env_args)
         self.map_elites = MAPElites(
@@ -75,7 +75,7 @@ class ArchitextELM:
 
 # Load hydra config from yaml files and command line arguments.
 @hydra.main(
-    config_path="config", config_name="architext_cfg", version_base="1.2"
+    config_path="config", config_name="architext_gpt3.5_cfg", version_base="1.2"
 )
 def main(cfg):
     print("----------------- Config ---------------")

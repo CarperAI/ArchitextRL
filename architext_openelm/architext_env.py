@@ -3,13 +3,12 @@ import numpy as np
 from omegaconf import DictConfig, OmegaConf
 from typing import List
 from architext_genotype import ArchitextGenotype
+from model import build_default_mutation_model
 from model import ArchitextPromptMutation
 from openelm.mutation_model import PromptModel
 from openelm.environments import ENVS_DICT
 
-
-architext_init_args = {"config": "architext_cfg.yaml",
-                       "prompts": None}
+architext_init_args = {"config": "architext_cfg.yaml"}
 
 
 class BaseEnvironment:
@@ -18,11 +17,11 @@ class BaseEnvironment:
 
 class Architext(BaseEnvironment):
     """
-    This will try to mutate layouts using architext-FIM models.
+    This will try to mutate layouts using either prompt mutation of diff model mutation.
 
     The Heat Loss Form Factor will be used as the quality metric, defined as:
     heat loss form factor = heat loss area / treated floor area, assuming that all area is treated.
-    Numerically, this is calculated as: hllff = sum(surface_area) / floor_area
+    Numerically, this is calculated as: hlff = sum(surface_area) / floor_area
 
     The behavioral descriptors will be layout typology (measured by number of bedrooms and bathrooms) and the entropy
     of the floor area distribution across different spaces in the layout.
@@ -30,23 +29,21 @@ class Architext(BaseEnvironment):
     # Record different definitions of behaviour spaces in a dict. Feel free to add.
     behavior_mode_spec = {'hlff_and_fae': {'genotype_ndim': 2,
                                            'genotype_space': np.array([[0.5, 5.5], [0, 2000]]).T
-                                           }
+                                           },
+                          'entropy_and_typology': {'genotype_ndim': 2,
+                                                   'genotype_space': np.array([[0, 5], [0, 12]]).T
+                                                   }
                           }
-    model_param = {'do_sample': True,
-                   'num_beams': 1,
-                   'max_length': 500}
 
     def __init__(self,
                  config: Union[str, dict, DictConfig],
-                 prompts: Optional[list] = None,
                  mutation_model: Optional[PromptModel] = None,
-                 behavior_mode='hlff_and_fae'
+                 behavior_mode='entropy_and_typology'
                  ):
         """
         Args:
             config: the config file or dict.
-            prompts: list of different prompts that can be attached to selected layouts.
-            model: (Optional) the model used to perform generation and mutation.
+            mutation_model: (Optional) the model used to perform generation and mutation.
             behavior_mode: (Optional) the choice of behavior spaces (defined by diversity metrics)
         """
         self.np_rng = np.random.RandomState(seed=np.random.randint(1, 1e8))
@@ -57,14 +54,6 @@ class Architext(BaseEnvironment):
             self.config = DictConfig(config)
         else:
             raise ValueError
-        self.batch_size = self.config.batch_size
-
-        if prompts is not None:
-            self.prompts = prompts
-        else:
-            with open('../prompts.txt', 'r') as f:
-                prompts = [p.strip() for p in f.read().split('\n') if p.strip()]
-            self.prompts = ['[prompt] ' + prompt.rstrip() + ' [layout]' for prompt in prompts]
 
         # Use RNG to rotate random seeds during inference.
         self.rng = np.random.default_rng(seed=self.config.seed)
@@ -73,7 +62,9 @@ class Architext(BaseEnvironment):
         self.genotype_ndim = self.behavior_mode_spec[self.behaviour_mode]['genotype_ndim']
         self.genotype_space = self.behavior_mode_spec[self.behaviour_mode]['genotype_space']
 
-        self.model = ArchitextPromptMutation(self.config, self.prompts) if mutation_model is None else mutation_model
+        self.model = build_default_mutation_model(self.config.mutation_model, self.config) \
+            if mutation_model is None else mutation_model
+        self.batch_size = self.config.batch_size
 
     def random(self) -> List[ArchitextGenotype]:
         """
@@ -81,8 +72,7 @@ class Architext(BaseEnvironment):
         Returns:
             the generated layouts as a list of ArchitextGenotype.
         """
-        return self._get_layout([{"prompt": None} for _ in range(self.batch_size)],
-                                parents=[None] * self.batch_size)
+        return self.model.mutate_genotypes([None] * self.batch_size)
 
     def mutate(self, x: list[ArchitextGenotype]) -> List[ArchitextGenotype]:
         """
@@ -93,11 +83,11 @@ class Architext(BaseEnvironment):
         Returns:
             the generated layout as a list of ArchitextGenotype.
         """
-        return self._get_layout([{"prompt": elem.to_design_string()} for elem in x], parents=x)
+        return self.model.mutate_genotypes(x)
 
     @staticmethod
-    def fitness(x: ArchitextGenotype) -> float:
-        if x.valid:
+    def fitness(x: ArchitextGenotype | None) -> float:
+        if x is not None and x.valid:
             return x.hlff()
         else:
             return -np.inf
@@ -105,12 +95,6 @@ class Architext(BaseEnvironment):
     @staticmethod
     def to_string(x: ArchitextGenotype) -> str:
         return str(x)
-
-    def _get_layout(self, prompt_dicts, parents: list[Optional[ArchitextGenotype]]) -> list[ArchitextGenotype]:
-        return [ArchitextGenotype(design_string=elem,
-                                  height=self.config.height,
-                                  parent=parent) for elem, parent in
-                zip(self.model.generate_programs(prompt_dicts), parents)]
 
     @staticmethod
     def _has_valid_output(x: ArchitextGenotype) -> bool:

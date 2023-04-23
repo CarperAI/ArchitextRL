@@ -1,16 +1,7 @@
-import os
-import random
 import numpy as np
-from abc import ABC
 import math
 import re
-from omegaconf import DictConfig, OmegaConf
-from shapely.geometry.polygon import Polygon
-from shapely.geometry import shape
-from shapely.affinity import scale
-from shapely.ops import unary_union
 import networkx as nx
-from typing import List
 from PIL import Image, ImageDraw
 
 
