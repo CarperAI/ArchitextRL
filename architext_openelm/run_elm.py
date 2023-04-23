@@ -52,7 +52,6 @@ class ArchitextELM:
                 By default, this function is the zero function (no random steps for second epochs and further).
 
         """
-        histories = defaultdict(list)
         if evo_init_step_scheduler is None:
             def evo_init_step_scheduler(step: int):
                 return 0
@@ -62,13 +61,12 @@ class ArchitextELM:
                 init_steps=self.cfg.evo_init_steps, total_steps=self.cfg.evo_n_steps
             )
             # Histories are reset every time when `.search` is called. We have to dump and merge it.
-            for key, val in self.map_elites.history.items():
-                histories[key].extend(val.copy())
-
             with open(f'recycled.pkl', 'wb') as f:
                 pickle.dump(self.map_elites.recycled, f)
             with open(f'map.pkl', 'wb') as f:
                 pickle.dump(self.map_elites.genomes, f)
+            with open(f'history.pkl', 'wb') as f:
+                pickle.dump(self.map_elites.history, f)
 
             self.cfg.evo_init_steps = evo_init_step_scheduler(i+1)
 

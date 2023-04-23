@@ -185,7 +185,7 @@ class ArchitextChatGPTMutation(PromptModel):
                                 f"Exception: {str(e)}\n"
                                 )
                     mutated_genotypes.append(None)
-        print(mutated_genotypes)
+
         return mutated_genotypes
 
     @staticmethod
