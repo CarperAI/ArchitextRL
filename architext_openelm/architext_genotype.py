@@ -1,4 +1,5 @@
 import re
+import string
 from typing import Optional
 
 import numpy as np
@@ -160,6 +161,8 @@ class ArchitextGenotype(Genotype):
         prefix = f"[prompt] {design_dict['prompt']} [layout] "
         coord_strings = []
         for rm in design_dict["layout"]:
+            if rm.rstrip(string.digits) not in ArchitextGenotype.visualization_dict:
+                continue
             coord = "".join([f"({x},{y})" for x, y in design_dict["layout"][rm]])
             coord_strings.append(f"{rm}: {coord},")
         return prefix + " ".join(coord_strings) + " <|endoftext|>"

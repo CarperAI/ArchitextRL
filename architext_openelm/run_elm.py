@@ -40,7 +40,7 @@ class ArchitextELM:
             history_length=self.cfg.evo_history_length,
         )
 
-    def run(self, evo_init_step_scheduler=None):
+    def run(self, evo_init_step_scheduler=None, suffix=""):
         """
         Run MAPElites for self.cfg.epoch number of times. Can optionally add in an initial step scheduler
         to determine how many random steps are needed for each epoch.
@@ -50,6 +50,7 @@ class ArchitextELM:
                 and outputs the corresponding number of initial random steps in each epoch. Note that the
                 first epoch (indexed 0) will always perform `self.cfg.evo_init_step` random steps.
                 By default, this function is the zero function (no random steps for second epochs and further).
+            suffix: (Optional) filename suffix.
 
         """
         if evo_init_step_scheduler is None:
@@ -63,7 +64,9 @@ class ArchitextELM:
             # Histories are reset every time when `.search` is called. We have to dump and merge it.
             with open(f'recycled.pkl', 'wb') as f:
                 pickle.dump(self.map_elites.recycled, f)
-            with open(f'map.pkl', 'wb') as f:
+            if suffix:
+                suffix = "_" + suffix
+            with open(f'map{suffix}.pkl', 'wb') as f:
                 pickle.dump(self.map_elites.genomes, f)
             with open(f'history.pkl', 'wb') as f:
                 pickle.dump(self.map_elites.history, f)

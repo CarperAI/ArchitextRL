@@ -170,7 +170,7 @@ class ArchitextChatGPTMutation(PromptModel):
             else:
                 assert isinstance(x, str)
                 try:
-                    new_dict = max_json.match(x).group(0)
+                    new_dict = max_json.search(x).group(0)
                     new_dict = ast.literal_eval(new_dict)
                     mutated_genotypes.append(
                         ArchitextGenotype.from_dict(new_dict,
@@ -198,12 +198,11 @@ class ArchitextChatGPTMutation(PromptModel):
         example, prompt = args
 
         requirements = "1. The design should follow the description given by the prompt.\n" \
-                       "2. The design should be valid. That is, it should not have any overlapping rooms, " \
-                       "and all rooms should be connected.\n" \
-                       "3. The room names should be one of 'living_room', ''kitchen', 'bedroom', 'bathroom', " \
-                       "'corridor', followed by potentially a number if there are multiple of the same kind.\n" \
+                       "2. There should not be any overlapping rooms. " \
+                       "3. The room names should start with one of 'living_room', ''kitchen', 'bedroom', 'bathroom', " \
+                       "'corridor'.\n" \
                        "4. There are no more than 4 bedrooms.\n" \
-                       "5. The number of bathrooms is no more than the number of bedrooms.\n" \
+                       "5. There are fewer bathrooms than bedrooms.\n" \
                        "6. Return the full JSON document without any extra words.\n"
         prompt = "```\n" + str(example) + "\n```\n" + \
                  "The above JSON document describes a prompt and a floor plan. " \
@@ -211,7 +210,7 @@ class ArchitextChatGPTMutation(PromptModel):
                  "Please follow the format of the given JSON document and generate a design " \
                  "where the prompt field is the following:\n" + \
                  "`" + prompt + "`\n\n" + \
-                 "The following are the requirements:\n" + requirements
+                 "Requirements:\n" + requirements
         for i in range(5):
             try:
                 completion = openai.ChatCompletion.create(
