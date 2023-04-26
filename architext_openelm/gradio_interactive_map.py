@@ -43,7 +43,8 @@ def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: floa
         elm_obj = ArchitextELM(cfg)
     elm_obj.cfg.evo_init_steps = init_step
     elm_obj.cfg.evo_n_steps = init_step + mutate_step
-    elm_obj.cfg.batch_size = batch_size
+    elm_obj.environment.batch_size = batch_size
+    elm_obj.map_elites.env.batch_size = batch_size
     elm_obj.run()
 
     elm_imgs.append(get_imgs(elm_obj.map_elites.genomes))
@@ -64,6 +65,17 @@ def save():
         pickle.dump(elm_obj.map_elites.genomes, f)
     with open(f'history.pkl', 'wb') as f:
         pickle.dump(elm_obj.map_elites.history, f)
+
+
+def on_select(evt: gr.SelectData):
+    x, y = evt.index
+    print("index: ", evt.index)
+
+    genome = elm_obj.map_elites.genomes[x, y]
+    if genome is None:
+        return {}
+    else:
+        return genome.get_json()
 
 
 with gr.Blocks() as demo:
@@ -89,6 +101,11 @@ with gr.Blocks() as demo:
                 value=2,
             )
             btn = gr.Button("Run")
+            design_json = gr.JSON(
+                label="Design JSON",
+                show_label=False,
+                value="{}",
+            )
             slider = gr.Slider(
                     minimum=0,
                     maximum=20,
@@ -108,6 +125,7 @@ with gr.Blocks() as demo:
                 ).style(columns=10, rows=10, container=False, object_fit="contain", height="100%")
 
     btn.click(run_elm, [api_key, init_step, mutate_step, batch_size], [gallery, slider], show_progress=True)
+    gallery.select(on_select, None, design_json)
     save_btn.click(save, None, None)
     slider.change(slider_change, slider, gallery)
 

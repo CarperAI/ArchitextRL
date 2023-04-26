@@ -73,7 +73,6 @@ class ArchitextPromptMutation(PromptModel):
             self.model = AutoModelForCausalLM.from_pretrained(self.cfg.model,
                                                               use_auth_token=self.token).to(self.device)
 
-    # def generate_programs(self, prompt_dicts: list[dict[str, str]], **kwargs) -> list[str]:
     def mutate_genotypes(self, inputs: list[ArchitextGenotype], **kwargs) -> list[ArchitextGenotype]:
         """
         This class does not use codes as intermediate representation. To fit into the genotype format, we output
@@ -198,12 +197,12 @@ class ArchitextChatGPTMutation(PromptModel):
         example, prompt = args
 
         requirements = "1. The design should follow the description given by the prompt.\n" \
-                       "2. There should not be any overlapping rooms. " \
+                       "2. There should not be any overlapping rooms.\n" \
                        "3. The room names should start with one of 'living_room', ''kitchen', 'bedroom', 'bathroom', " \
                        "'corridor'.\n" \
                        "4. There are no more than 4 bedrooms.\n" \
                        "5. There are fewer bathrooms than bedrooms.\n" \
-                       "6. Return the full JSON document without any extra words.\n"
+                       "6. Only return the JSON document without any extra words.\n"
         prompt = "```\n" + str(example) + "\n```\n" + \
                  "The above JSON document describes a prompt and a floor plan. " \
                  "Each room is represented as a list of coordinates defining a polygon. " \
