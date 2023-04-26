@@ -109,6 +109,7 @@ with gr.Blocks() as demo:
             slider = gr.Slider(
                     minimum=0,
                     maximum=20,
+                    step=1
             )
             save_btn = gr.Button("Save")
         with gr.Column(scale=10):
