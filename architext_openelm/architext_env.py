@@ -4,7 +4,6 @@ from omegaconf import DictConfig, OmegaConf
 from typing import List
 from architext_genotype import ArchitextGenotype
 from model import build_default_mutation_model
-from model import ArchitextPromptMutation
 from openelm.mutation_model import PromptModel
 from openelm.environments import ENVS_DICT
 
@@ -38,7 +37,7 @@ class Architext(BaseEnvironment):
     def __init__(self,
                  config: Union[str, dict, DictConfig],
                  mutation_model: Optional[PromptModel] = None,
-                 behavior_mode='entropy_and_typology'
+                 behavior_mode: str | dict = 'entropy_and_typology'
                  ):
         """
         Args:
@@ -58,9 +57,11 @@ class Architext(BaseEnvironment):
         # Use RNG to rotate random seeds during inference.
         self.rng = np.random.default_rng(seed=self.config.seed)
 
-        self.behaviour_mode = behavior_mode
-        self.genotype_ndim = self.behavior_mode_spec[self.behaviour_mode]['genotype_ndim']
-        self.genotype_space = self.behavior_mode_spec[self.behaviour_mode]['genotype_space']
+        if isinstance(behavior_mode, str):
+            behavior_mode = self.behavior_mode_spec[behavior_mode]
+        self.behavior_mode = behavior_mode
+        self.genotype_ndim = self.behavior_mode['genotype_ndim']
+        self.genotype_space = self.behavior_mode['genotype_space']
 
         self.model = build_default_mutation_model(self.config.mutation_model, self.config) \
             if mutation_model is None else mutation_model

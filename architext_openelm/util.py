@@ -1,8 +1,12 @@
+import pathlib
+
 import numpy as np
 import math
 import re
 import networkx as nx
 from PIL import Image, ImageDraw
+save_folder = pathlib.Path(__file__).parent
+base_folder = pathlib.Path(__file__).parent
 
 
 def draw_polygons(polygons, colors, im_size=(256, 256), b_color="white", fpath=None):

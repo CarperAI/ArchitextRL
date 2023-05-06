@@ -9,6 +9,7 @@ from getpass import getpass
 import openai
 
 import numpy as np
+import streamlit
 import torch as torch
 from omegaconf import DictConfig, OmegaConf
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -17,6 +18,7 @@ from openelm.mutation_model import PromptModel
 
 from architext_genotype import ArchitextGenotype
 from concurrent.futures import ThreadPoolExecutor
+from util import base_folder
 
 max_json = re.compile(r"\{[\d\D]*\}")
 
@@ -122,7 +124,9 @@ class ArchitextChatGPTMutation(PromptModel):
     This prompt mutation calls GPT-3.5 API to generate designs
     """
 
-    def __init__(self, cfg, prompts: list[str], seed_designs: list[dict] | None = None, default_height=2.0):
+    def __init__(self, cfg, prompts: list[str],
+                 seed_designs: list[dict] | None = None, default_height=2.0,
+                 count_tokens: bool = False, **kwargs):
         """
         Args:
             cfg: the config dict.
@@ -150,6 +154,10 @@ class ArchitextChatGPTMutation(PromptModel):
         else:
             openai.api_key = getpass('Enter your OpenAI API key:')
 
+        self.count_tokens = count_tokens
+        if self.count_tokens:
+            import streamlit
+
     def mutate_genotypes(self, genotypes: list[ArchitextGenotype], num_threads=10, **kwargs) -> list[ArchitextGenotype]:
         args = []
         for x in genotypes:
@@ -158,7 +166,14 @@ class ArchitextChatGPTMutation(PromptModel):
             args.append((example, prompt))
 
         with ThreadPoolExecutor(num_threads) as pool:
-            mutated_json = list(pool.map(self._get_completion, args))
+            results = list(pool.map(self._get_completion, args))
+        mutated_json, usages = [r[0] for r in results], [r[1] for r in results]
+        if self.count_tokens:
+            for usage in usages:
+                streamlit.session_state["prompt_tokens"] = \
+                    streamlit.session_state.get("prompt_tokens", 0) + usage.get("prompt_tokens", 0)
+                streamlit.session_state["tokens"] = \
+                    streamlit.session_state.get("tokens", 0) + usage.get("total_tokens", 0)
 
         self._log_returns(mutated_json)
 
@@ -188,7 +203,7 @@ class ArchitextChatGPTMutation(PromptModel):
         return mutated_genotypes
 
     @staticmethod
-    def _get_completion(args) -> str | None:
+    def _get_completion(args) -> tuple[str | None, dict]:
         """
         The inner loop of getting new design json from GPT-3.5 API.
         args: a tuple of (example, prompt)
@@ -196,27 +211,30 @@ class ArchitextChatGPTMutation(PromptModel):
         """
         example, prompt = args
 
-        requirements = "1. The design should follow the description given by the prompt.\n" \
-                       "2. There should not be any overlapping rooms.\n" \
-                       "3. The room names should start with one of 'living_room', ''kitchen', 'bedroom', 'bathroom', " \
+        requirements = "1. the design detailed in `layout` must follow the prompt as "\
+                       "closely as possible.\n" \
+                       "2. Rooms cannot overlap.\n" \
+                       "3. The room names should start with one of 'living_room', 'kitchen', 'bedroom', 'bathroom', " \
                        "'corridor'.\n" \
-                       "4. There are no more than 4 bedrooms.\n" \
-                       "5. There are fewer bathrooms than bedrooms.\n" \
-                       "6. Only return the JSON document without any extra words.\n"
-        prompt = "```\n" + str(example) + "\n```\n" + \
-                 "The above JSON document describes a prompt and a floor plan. " \
-                 "Each room is represented as a list of coordinates defining a polygon. " \
-                 "Please follow the format of the given JSON document and generate a design " \
-                 "where the prompt field is the following:\n" + \
-                 "`" + prompt + "`\n\n" + \
-                 "Requirements:\n" + requirements
+                       "4. Number of bathroom <= Number of bedroom <= 4.\n" \
+                       "5. You only return valid JSON documents without extra words.\n"
+        sys_msg = "You are a REST API server receiving prompts describing a floor plan. You return JSON " \
+                  "documents strictly containing\n"\
+                  "1. `prompt`: the original input prompt, \n"\
+                  "2. `layout`: the room-by-room details of the floor plan in terms of the coordinates.\n"\
+                  "An example is the following:\n" \
+                  "```\n" + str(example) + "\n```\n" \
+                  "In the `layout` field, each room is represented as a list of coordinates defining a polygon.\n" \
+                  "The returned JSON document must satisfy " \
+                  "the following requirements:\n" + requirements
         for i in range(5):
             try:
                 completion = openai.ChatCompletion.create(
                     model="gpt-3.5-turbo",
-                    messages=[{"role": "user", "content": prompt}]
+                    messages=[{"role": "system", "content": sys_msg}, {"role": "user", "content": prompt}]
                 )
-                return completion["choices"][0]["message"]["content"]
+
+                return completion["choices"][0]["message"]["content"], completion["usage"]
             except:
                 time.sleep(60)
                 if i == 4:
@@ -227,7 +245,7 @@ class ArchitextChatGPTMutation(PromptModel):
                         f.write(f"[{timestamp} ERROR]: Calling OAI API failed for 5 consecutive times.\n"
                                 "Prompt: " + prompt + "\n"
                                                       "Example: " + str(example) + "\n")
-                    return None
+                return None, {}
 
     @staticmethod
     def _log_returns(mutated_json):
@@ -239,21 +257,25 @@ class ArchitextChatGPTMutation(PromptModel):
             f.write(f"[{timestamp} INFO]: Returned JSONs: " + str(mutated_json) + "\n")
 
 
-def build_default_mutation_model(key: str, cfg: DictConfig):
+def build_default_mutation_model(key: str, cfg: DictConfig, count_tokens: bool = True):
     """
     A utility function that builds a default version of each mutation model class.
 
     Args:
         key (str): A key that defines the mutation model.
+        cfg (DictConfig): A configuration object.
+        count_tokens (bool): Whether to count the number of tokens in the generated text.
+            Note: if True, it will import streamlit and count OpenAI API tokens using
+            streamlit.session_state['tokens'].
 
     Returns:
         MutationModel: A mutation model.
     """
-    with open('prompts.txt', 'r') as f:
+    with open(str(base_folder / 'prompts.txt'), 'r') as f:
         prompts = [p.strip() for p in f.read().split('\n') if p.strip()]
     aug_prompts = ['[prompt] ' + prompt.rstrip() + ' [layout]' for prompt in prompts]
 
-    with open("seed_designs.json", "r") as f:
+    with open(str(base_folder / "seed_designs.json"), "r") as f:
         seed_designs = json.load(f)
 
     if key == "gpt-j":
@@ -265,4 +287,5 @@ def build_default_mutation_model(key: str, cfg: DictConfig):
         return ArchitextChatGPTMutation(cfg,
                                         prompts=prompts,
                                         seed_designs=seed_designs,
-                                        default_height=cfg.height)
+                                        default_height=cfg.height,
+                                        count_tokens=count_tokens)

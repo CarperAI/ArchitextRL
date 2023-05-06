@@ -1,4 +1,4 @@
-git+https://github.com/CarperAI/OpenELM.git
+openelm
 torch
 shapely
 numpy
