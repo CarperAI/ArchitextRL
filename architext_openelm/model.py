@@ -211,15 +211,15 @@ class ArchitextChatGPTMutation(PromptModel):
         """
         example, prompt = args
 
-        requirements = "1. the design detailed in `layout` must follow the prompt as "\
+        requirements = "1. The prompt is all the info you have. The design detailed in `layout` follows the prompt as "\
                        "closely as possible.\n" \
-                       "2. Rooms cannot overlap.\n" \
+                       "2. Different rooms cannot overlap.\n" \
                        "3. The room names should start with one of 'living_room', 'kitchen', 'bedroom', 'bathroom', " \
                        "'corridor'.\n" \
                        "4. Number of bathroom <= Number of bedroom <= 4.\n" \
-                       "5. You only return valid JSON documents without extra words.\n"
-        sys_msg = "You are a REST API server receiving prompts describing a floor plan. You return JSON " \
-                  "documents strictly containing\n"\
+                       "5. The return must be a valid JSON document.\n"
+        sys_msg = "You are a REST API server receiving prompts describing a floor plan. You only return JSON " \
+                  "documents describing your design. The format is the following:\n"\
                   "1. `prompt`: the original input prompt, \n"\
                   "2. `layout`: the room-by-room details of the floor plan in terms of the coordinates.\n"\
                   "An example is the following:\n" \

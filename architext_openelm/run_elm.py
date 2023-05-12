@@ -141,6 +141,7 @@ class MyMAPElites(MAPElites):
             # placed in the same niche, for saving histories.
             for individual in new_individuals:
                 fitness = self.env.fitness(individual)
+                print(fitness)
                 if np.isinf(fitness):
                     continue
                 map_ix = self.to_mapindex(individual.to_phenotype())
@@ -230,7 +231,8 @@ class ArchitextELM:
 
         def after_step(locals):
             if progress_bar is not None:
-                progress_bar.progress((locals["n_steps"] + 1) / locals["total_steps"])
+                progress_bar.progress((locals["n_steps"] + 1) / locals["total_steps"],
+                                      text="Generation in progress. Please wait.")
 
         for i in range(self.cfg.epoch):
             self.map_elites.search(

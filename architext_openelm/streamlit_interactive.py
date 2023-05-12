@@ -12,12 +12,12 @@ import io
 import base64
 import os
 import pickle
-
 from omegaconf import OmegaConf
-
+from threading import Lock
 from run_elm import ArchitextELM
 from util import save_folder
 
+_lock = Lock()
 
 def img_process(img_bytes):
     encoded_img = base64.b64encode(img_bytes).decode()
@@ -50,9 +50,14 @@ def get_blank_grid():
 
 
 def update_starts():
-    if st.session_state["elm_obj"] is not None:
+    if st.session_state.get("elm_obj", None) is not None:
         st.session_state["x_start"] = int(st.session_state["elm_obj"].environment.behavior_mode["genotype_space"][0, 1])
         st.session_state["y_start"] = st.session_state["elm_obj"].environment.behavior_mode["genotype_space"][0, 0]
+
+
+def _post_run():
+    with open(session_loc, "wb") as f:
+        pickle.dump({k: st.session_state[k] for k in ["elm_obj", "elm_imgs"]}, f)
 
 
 typologies = ["1b1b", "2b1b", "2b2b", "3b1b", "3b2b", "3b3b", "4b1b", "4b2b", "4b3b", "4b4b"]
@@ -114,7 +119,7 @@ def get_elm_obj(old_elm_obj=None):
     return elm_obj
 
 
-def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: float):
+def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: float, placeholder=None):
     os.environ["OPENAI_API_KEY"] = api_key
 
     if st.session_state["elm_obj"] is None:
@@ -122,12 +127,16 @@ def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: floa
 
     elm_obj = st.session_state["elm_obj"]
     update_elm_obj(elm_obj, init_step=init_step, mutate_step=mutate_step, batch_size=batch_size)
-    progress_text = "Generation in progress. Please wait."
-    my_bar = st.progress(0, text=progress_text)
-    elm_obj.run(progress_bar=my_bar)
 
+    if placeholder is not None:
+        pbar = placeholder.progress(1, text="Generation in progress. Please wait.")
+    else:
+        pbar = None
+    elm_obj.run(progress_bar=pbar)
     st.session_state["elm_imgs"] = [get_imgs(elm_obj.map_elites.genomes)]
-    my_bar.empty()
+    save()
+    _post_run()
+    st.experimental_rerun()
 
 
 def export(map_elites):
@@ -168,7 +177,6 @@ def load(api_key):
     if genomes.dims != (WIDTH, HEIGHT):
         last_msg = f"Map size mismatch. Got {genomes.dims} != {(WIDTH, HEIGHT)}"
         st.session_state["last_msg"] = last_msg
-        print(last_msg)
         return
 
     st.session_state["elm_obj"] = get_elm_obj(None)
@@ -179,6 +187,7 @@ def load(api_key):
 
     st.session_state["elm_imgs"] = [get_imgs(elm_obj.map_elites.genomes)]
 
+    _post_run()
 
 
 def recenter():
@@ -216,9 +225,11 @@ st.write("1. Paste your OAI key (we do not save it, as you can check from our so
          "https://github.com/CarperAI/ArchitextRL/tree/main/architext_openelm).")
 st.write("2. Choose the parameters for the map generation.")
 st.write("3. Click `run`.")
+st.write("*DO NOT REFRESH.* Every session has a unique id and will be lost upon refresh. Make sure to download "
+         "the map if you want to keep it.")
 st.write("## Other buttons and options")
-st.write("- `Recenter` button is the biggest player here: if you select a grid on the map, clicking "
-         " `Recenter` will recenter the map for you unless an axis could go out-of-bound. "
+st.write("- `Re-center` button is the biggest player here: if you select a grid on the map, clicking "
+         " `Re-center` will recenter the map for you unless an axis could go out-of-bound. "
          "A new MAPElites object will be generated in this process, but all genomes will be copied over "
          "(and some invalid genomes might revive because the range of the diversity metrics changed).")
 st.write("- `Save` button will save the state of the map into a pickle file.")
@@ -236,7 +247,19 @@ with col1:
     save_path = save_folder / f'saved_{st.session_state["session_id"]}.pkl'
 
     run = st.button("Run")
-    uploaded_file = st.file_uploader("Upload map")
+    do_recenter = st.button("Re-center")
+    with st.form("file uploader", clear_on_submit=True):
+        uploaded_file = st.file_uploader("Upload your map", type=["pkl"])
+        submitted = st.form_submit_button("Upload")
+
+        if submitted and uploaded_file is not None:
+            with _lock:
+                bytes_data = uploaded_file.getvalue()
+                with open(save_path, "wb") as f:
+                    f.write(bytes_data)
+                load(api_key)
+                st.experimental_rerun()
+
     if os.path.exists(save_path):
         do_load = st.button("Load the map")
     else:
@@ -249,16 +272,7 @@ with col1:
                 data=file,
                 file_name=f'saved_{st.session_state["session_id"]}.pkl',
             )
-    do_recenter = st.button("Re-center")
 
-if run:
-    run_elm(api_key, init_step, mutate_step, batch_size)
-
-if uploaded_file is not None:
-    bytes_data = uploaded_file.getvalue()
-    with open(save_path, "wb") as f:
-        f.write(bytes_data)
-    load(api_key)
 
 if do_load:
     load(api_key)
@@ -271,17 +285,19 @@ if do_recenter:
 
 with col2:
     assert st.session_state["x_start"] + WIDTH <= len(typologies)
-    clicked = st_grid(
-        [img_process(image_to_byte_array(img.convert('RGB'))) for img in st.session_state["elm_imgs"][0]],
-        titles=[f"Image #{str(i)}" for i in range(len(st.session_state["elm_imgs"][0]))],
-        div_style={"justify-content": "center", "width": "650px", "overflow": "auto"},
-        table_style={"justify-content": "center", "width": "100%"},
-        img_style={"cursor": "pointer"},
-        num_cols=WIDTH,
-        col_labels=typologies[st.session_state["x_start"]: st.session_state["x_start"] + WIDTH],
-        row_labels=["{:.2f}".format(i * Y_STEP + st.session_state["y_start"]) for i in range(HEIGHT)],
-        selected=int(st.session_state.get("last_clicked", -1)),
-    )
+    pbar_placeholder = st.empty()
+    with pbar_placeholder:
+        clicked = st_grid(
+            [img_process(image_to_byte_array(img.convert('RGB'))) for img in st.session_state["elm_imgs"][0]],
+            titles=[f"Image #{str(i)}" for i in range(len(st.session_state["elm_imgs"][0]))],
+            div_style={"justify-content": "center", "width": "650px", "overflow": "auto"},
+            table_style={"justify-content": "center", "width": "100%"},
+            img_style={"cursor": "pointer"},
+            num_cols=WIDTH,
+            col_labels=typologies[st.session_state["x_start"]: st.session_state["x_start"] + WIDTH],
+            row_labels=["{:.2f}".format(i * Y_STEP + st.session_state["y_start"]) for i in range(HEIGHT)],
+            selected=int(st.session_state.get("last_clicked", -1)),
+        )
 
 with col3:
     if "last_msg" in st.session_state:
@@ -294,7 +310,7 @@ with col3:
     if "tokens" in st.session_state:
         st.write(f"Total Tokens: {st.session_state['tokens']}")
 
-    if "elm_obj" in st.session_state and st.session_state["elm_obj"] is not None:
+    if st.session_state.get("elm_obj", None) is not None:
         st.write(f"Niches filled: {st.session_state['elm_obj'].map_elites.fitnesses.niches_filled}")
         st.write(
             f"Objects in recycle queue: {sum(obj is not None for obj in st.session_state['elm_obj'].map_elites.recycled)}")
@@ -307,10 +323,18 @@ with col3:
             if genome != 0.0:
                 st.json(genome.design_json)
 
+#print(st.session_state['elm_obj'].map_elites.fitnesses.array)
+if st.session_state.get("elm_obj", None) is not None:
+    print(sum(obj is not None for obj in st.session_state['elm_obj'].map_elites.recycled))
+
+if run:
+    run_elm(api_key, init_step, mutate_step, batch_size, placeholder=pbar_placeholder)
+
+
 if clicked != "" and clicked != -1:
     st.session_state["last_clicked"] = int(clicked)
     st.experimental_rerun()
 
-with open(session_loc, "wb") as f:
-    pickle.dump({k: st.session_state[k] for k in ["elm_obj", "elm_imgs"]}, f)
-    print(f"Session {st.session_state['session_id']} for ELM pictures saved")
+_post_run()
+st.session_state["last_msg"] = ""
+
