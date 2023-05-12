@@ -6,8 +6,10 @@ import pickle
 import numpy as np
 from omegaconf import OmegaConf
 from openelm.map_elites import MAPElites, Phenotype, MapIndex, Map
+from tqdm import trange
+
 from architext_env import Architext, architext_init_args
-from openelm.environments import ENVS_DICT
+from openelm.environments import ENVS_DICT, Genotype
 
 from util import save_folder
 
@@ -94,6 +96,85 @@ class MyMAPElites(MAPElites):
         if recycled is not None:
             self.recycled = recycled
 
+    def search(self, init_steps: int, total_steps: int, atol: float = 1.0, after_step=lambda **kwargs: None) -> str:
+        """
+        Run the MAP-Elites search algorithm.
+
+        Args:
+            init_steps (int): Number of initial random solutions to generate.
+            total_steps (int): Total number of steps to run the algorithm for,
+                including initial steps.
+            atol (float, optional): Tolerance for how close the best performing
+                solution has to be to the maximum possible fitness before the
+                search stops early. Defaults to 1.
+            after_step (function, optional): A callback function to run after each step.
+
+        Returns:
+            str: A string representation of the best perfoming solution. The
+                best performing solution object can be accessed via the
+                `current_max_genome` class attribute.
+        """
+        tbar = trange(int(total_steps))
+        max_fitness = -np.inf
+        max_genome = None
+        if self.save_history:
+            self.history = defaultdict(list)
+
+        for n_steps in tbar:
+            if n_steps < init_steps or self.genomes.empty:
+                # Initialise by generating initsteps random solutions.
+                # If map is still empty: force to do generation instead of mutation.
+                # TODO: use a separate sampler, move batch size to qd config.
+                new_individuals: list[Genotype] = self.env.random()
+            else:
+                # Randomly select a batch of elites from the map.
+                batch: list[Genotype] = []
+                for _ in range(self.env.batch_size):
+                    map_ix = self.random_selection()
+                    batch.append(self.genomes[map_ix])
+                # Mutate the elite.
+                new_individuals = self.env.mutate(batch)
+
+            # `new_individuals` is a list of generation/mutation. We put them
+            # into the behavior space one-by-one.
+            # TODO: account for the case where multiple new individuals are
+            # placed in the same niche, for saving histories.
+            for individual in new_individuals:
+                fitness = self.env.fitness(individual)
+                if np.isinf(fitness):
+                    continue
+                map_ix = self.to_mapindex(individual.to_phenotype())
+                # if the return is None, the individual is invalid and is thrown
+                # into the recycle bin.
+                if map_ix is None:
+                    self.recycled[self.recycled_count % len(self.recycled)] = individual
+                    self.recycled_count += 1
+                    continue
+
+                if self.save_history:
+                    # TODO: thresholding
+                    self.history[map_ix].append(individual)
+                self.nonzero[map_ix] = True
+
+                # If new fitness greater than old fitness in niche, replace.
+                if fitness > self.fitnesses[map_ix]:
+                    self.fitnesses[map_ix] = fitness
+                    self.genomes[map_ix] = individual
+                # If new fitness is the highest so far, update the tracker.
+                if fitness > max_fitness:
+                    max_fitness = fitness
+                    max_genome = individual
+
+                    tbar.set_description(f"{max_fitness=:.4f}")
+                # Stop if best fitness is within atol of maximum possible fitness.
+                if np.isclose(max_fitness, self.env.max_fitness, atol=atol):
+                    break
+
+            after_step(locals=locals())
+
+        self.current_max_genome = max_genome
+        return str(max_genome)
+
 
 
 class ArchitextELM:
@@ -128,7 +209,7 @@ class ArchitextELM:
             history_length=self.cfg.evo_history_length,
         )
 
-    def run(self, evo_init_step_scheduler=None, suffix="", save_each_epochs=False):
+    def run(self, evo_init_step_scheduler=None, suffix="", save_each_epochs=False, progress_bar=None):
         """
         Run MAPElites for self.cfg.epoch number of times. Can optionally add in an initial step scheduler
         to determine how many random steps are needed for each epoch.
@@ -140,15 +221,21 @@ class ArchitextELM:
                 By default, this function is the zero function (no random steps for second epochs and further).
             suffix: (Optional) filename suffix.
             save_each_epochs: (Optional) save after each epoch.
+            progress_bar: (Optional) a streamlit progress bar.
 
         """
         if evo_init_step_scheduler is None:
             def evo_init_step_scheduler(step: int):
                 return 0
 
+        def after_step(locals):
+            if progress_bar is not None:
+                progress_bar.progress((locals["n_steps"] + 1) / locals["total_steps"])
+
         for i in range(self.cfg.epoch):
             self.map_elites.search(
-                init_steps=self.cfg.evo_init_steps, total_steps=self.cfg.evo_n_steps
+                init_steps=self.cfg.evo_init_steps, total_steps=self.cfg.evo_n_steps,
+                after_step=after_step,
             )
             if save_each_epochs:
                 # Histories are reset every time when `.search` is called. We have to dump and merge it.
