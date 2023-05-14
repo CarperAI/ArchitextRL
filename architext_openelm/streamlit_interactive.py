@@ -133,10 +133,11 @@ def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: floa
     else:
         pbar = None
     elm_obj.run(progress_bar=pbar)
+    print(sum(obj is not None for obj in st.session_state['elm_obj'].map_elites.recycled))
+
     st.session_state["elm_imgs"] = [get_imgs(elm_obj.map_elites.genomes)]
-    save()
     _post_run()
-    st.experimental_rerun()
+    save()
 
 
 def export(map_elites):
@@ -328,7 +329,8 @@ if st.session_state.get("elm_obj", None) is not None:
     print(sum(obj is not None for obj in st.session_state['elm_obj'].map_elites.recycled))
 
 if run:
-    run_elm(api_key, init_step, mutate_step, batch_size, placeholder=pbar_placeholder)
+    with _lock:
+        run_elm(api_key, init_step, mutate_step, batch_size, placeholder=pbar_placeholder)
 
 
 if clicked != "" and clicked != -1:
