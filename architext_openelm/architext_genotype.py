@@ -14,7 +14,7 @@ from openelm.environments import Genotype
 Phenotype = Optional[np.ndarray]
 pattern = re.compile(r"\[prompt\] +(.*) \[layout\] +(.*) +<\|endoftext\|>")
 rooms = re.compile(r"([^ ]+): +([^ ]+)")
-coords = re.compile(r"\((-?\d+),(-?\d+)\)")
+coords = re.compile(r"\((-?[\d.]+),(-?[\d.]+)\)")
 
 
 class ErrorType(Enum):
@@ -49,15 +49,15 @@ class ArchitextGenotype(Genotype):
 
         self.parent = parent
 
-        # 1B1B, 2B1B, 2B2B, 3B1B, 3B2B, 3B3B, 4B1B, 4B2B, 4B3B, 4B4B, numbered consecutively
+        # 1B1B, 2B1B, 3B1B, 4B1B, 2B2B, 3B2B, 4B2B, 3B3B, 4B3B, 4B4B, numbered consecutively
         # label -> typology
         self.typologies_to = {
             num: typ
             for num, typ in enumerate(
-                [
+                sorted([
                     (i + 1, j + 1) for j in range(4) for i in range(4)
                     if j <= i
-                ]
+                ], key=lambda x: x[1])
             )}
         # typology -> label
         self.typologies_from = {typ: num for num, typ in self.typologies_to.items()}
@@ -100,7 +100,7 @@ class ArchitextGenotype(Genotype):
         valid = True
         color_regex = re.compile(rf"(" + r"|".join(list(self.visualization_dict.keys())) + rf")")
         for room in rooms.findall(layout):
-            self.design_json["layout"][room[0]] = [(x, y) for x, y in coords.findall(room[1])]
+            self.design_json["layout"][room[0]] = [(float(x), float(y)) for x, y in coords.findall(room[1])]
             try:
                 polygon = make_valid(Polygon(self.design_json["layout"][room[0]]))
                 if polygon.geom_type == "MultiPolygon":

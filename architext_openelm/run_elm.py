@@ -11,6 +11,7 @@ from tqdm import trange
 from architext_env import Architext, architext_init_args
 from openelm.environments import ENVS_DICT, Genotype
 
+from architext_genotype import ArchitextGenotype
 from util import save_folder
 
 ARG_DICT = {"architext": architext_init_args}
@@ -58,7 +59,9 @@ class MyMAPElites(MAPElites):
             max_fitness = -np.inf
 
         for individual in genotypes:
+            individual = ArchitextGenotype.from_dict(individual.design_json)
             fitness = self.env.fitness(individual)
+            print(individual.design_json)
             if np.isinf(fitness):
                 continue
             map_ix = self.to_mapindex(individual.to_phenotype())
@@ -141,7 +144,6 @@ class MyMAPElites(MAPElites):
             # placed in the same niche, for saving histories.
             for individual in new_individuals:
                 fitness = self.env.fitness(individual)
-                print(fitness)
                 if np.isinf(fitness):
                     continue
                 map_ix = self.to_mapindex(individual.to_phenotype())

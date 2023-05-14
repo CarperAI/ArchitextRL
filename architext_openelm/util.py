@@ -4,26 +4,40 @@ import numpy as np
 import math
 import re
 import networkx as nx
+from shapely import affinity
 from PIL import Image, ImageDraw
 save_folder = pathlib.Path(__file__).parent
 base_folder = pathlib.Path(__file__).parent
 
 
+def normalize(coord, offsets, scale):
+    return tuple(((coord[i] + offsets[i]) * scale) for i in range(2))
+
+
 def draw_polygons(polygons, colors, im_size=(256, 256), b_color="white", fpath=None):
-    image = Image.new("RGBA", im_size, color="white")  # Image.new("L", im_size, color="white")
+    min_x = min([min([p[0] for p in poly.exterior.coords]) for poly in polygons])
+    max_x = max([max([p[0] for p in poly.exterior.coords]) for poly in polygons])
+    min_y = min([min([p[1] for p in poly.exterior.coords]) for poly in polygons])
+    max_y = max([max([p[1] for p in poly.exterior.coords]) for poly in polygons])
+    offsets = (min_x, min_y)
+    scale = 256.0 / max(max_x - min_x, max_y - min_y)
+
+    image = Image.new("RGBA", im_size, color="white")
     draw = ImageDraw.Draw(image)
 
     for poly, color, in zip(polygons, colors):
-        xy = poly.exterior.xy
+        shifted_poly = affinity.translate(poly, xoff=-offsets[0], yoff=-offsets[1])
+        normalized_poly = affinity.scale(shifted_poly, xfact=scale, yfact=scale, origin=(0, 0))
+        xy = normalized_poly.exterior.xy
         coords = np.dstack((xy[1], xy[0])).flatten()
         draw.polygon(list(coords), fill=(0, 0, 0))
 
         # get inner polygon coordinates
-        small_poly = poly.buffer(-1, resolution=32, cap_style=2, join_style=2, mitre_limit=5.0)
+        small_poly = normalized_poly.buffer(-1, resolution=32, cap_style=2, join_style=2, mitre_limit=5.0)
         if small_poly.geom_type == 'MultiPolygon':
-            mycoordslist = [list(x.exterior.coords) for x in small_poly]
+            mycoordslist = [x.exterior.coords for x in small_poly]
             for coord in mycoordslist:
-                coords = np.dstack((np.array(coord)[:, 1], np.array(coord)[:, 0])).flatten()
+                coords = np.dstack((coord[1], coord[0])).flatten()
                 draw.polygon(list(coords), fill=tuple(color))
         elif small_poly.geom_type == 'Polygon':
             # get inner polygon coordinates

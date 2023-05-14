@@ -60,7 +60,7 @@ def _post_run():
         pickle.dump({k: st.session_state[k] for k in ["elm_obj", "elm_imgs"]}, f)
 
 
-typologies = ["1b1b", "2b1b", "2b2b", "3b1b", "3b2b", "3b3b", "4b1b", "4b2b", "4b3b", "4b4b"]
+typologies = ["1b1b", "2b1b", "3b1b", "4b1b", "2b2b", "3b2b", "4b2b", "3b3b", "4b3b", "4b4b"]
 
 # Initialize variables and state variables
 try:
@@ -133,7 +133,6 @@ def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: floa
     else:
         pbar = None
     elm_obj.run(progress_bar=pbar)
-    print(sum(obj is not None for obj in st.session_state['elm_obj'].map_elites.recycled))
 
     st.session_state["elm_imgs"] = [get_imgs(elm_obj.map_elites.genomes)]
     _post_run()
@@ -322,11 +321,8 @@ with col3:
             last_y = st.session_state["last_clicked"] // WIDTH
             genome = st.session_state["elm_obj"].map_elites.genomes[(last_y, last_x)]
             if genome != 0.0:
+                st.write(genome.typologies_from[genome.typology()])
                 st.json(genome.design_json)
-
-#print(st.session_state['elm_obj'].map_elites.fitnesses.array)
-if st.session_state.get("elm_obj", None) is not None:
-    print(sum(obj is not None for obj in st.session_state['elm_obj'].map_elites.recycled))
 
 if run:
     with _lock:
