@@ -61,7 +61,6 @@ class MyMAPElites(MAPElites):
         for individual in genotypes:
             individual = ArchitextGenotype.from_dict(individual.design_json)
             fitness = self.env.fitness(individual)
-            print(individual.design_json)
             if np.isinf(fitness):
                 continue
             map_ix = self.to_mapindex(individual.to_phenotype())
