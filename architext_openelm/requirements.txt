@@ -1,4 +1,4 @@
-git+https://github.com/CarperAI/OpenELM.git
+openelm
 torch
 shapely
 numpy
@@ -6,3 +6,4 @@ networkx
 transformers
 hydra-core>=1.2.0
 Pillow
+openai

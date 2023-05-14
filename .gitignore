@@ -9,6 +9,9 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+# Exception for architext_openelm/frontend/build
+!architext_openelm/frontend/build/
+
 develop-eggs/
 dist/
 downloads/
@@ -129,3 +132,5 @@ dmypy.json
 .pyre/
 logs/
 .pkl
+node_modules/
+sessions/

@@ -1,4 +1,5 @@
 import re
+import string
 from typing import Optional
 
 import numpy as np
@@ -13,7 +14,7 @@ from openelm.environments import Genotype
 Phenotype = Optional[np.ndarray]
 pattern = re.compile(r"\[prompt\] +(.*) \[layout\] +(.*) +<\|endoftext\|>")
 rooms = re.compile(r"([^ ]+): +([^ ]+)")
-coords = re.compile(r"\((-?\d+),(-?\d+)\)")
+coords = re.compile(r"\((-?[\d.]+),(-?[\d.]+)\)")
 
 
 class ErrorType(Enum):
@@ -26,7 +27,6 @@ class ErrorType(Enum):
 
 
 class ArchitextGenotype(Genotype):
-
     visualization_dict = {"living_room": [249, 222, 182],
                           "kitchen": [195, 209, 217],
                           "bedroom": [250, 120, 128],
@@ -44,27 +44,39 @@ class ArchitextGenotype(Genotype):
         self.design_colors = None
         self.design_merged_polygon = None
 
-        #end_index = layout.find(self.end_token_str)
-        #cut_off_index = end_index + len(self.end_token_str) if end_index != -1 else None
-        #self.layout = layout[:cut_off_index].strip()
-
         self.height = height
         self.parse_design()
 
         self.parent = parent
 
+        # 1B1B, 2B1B, 3B1B, 4B1B, 2B2B, 3B2B, 4B2B, 3B3B, 4B3B, 4B4B, numbered consecutively
+        # label -> typology
+        self.typologies_to = {
+            num: typ
+            for num, typ in enumerate(
+                sorted([
+                    (i + 1, j + 1) for j in range(4) for i in range(4)
+                    if j <= i
+                ], key=lambda x: x[1])
+            )}
+        # typology -> label
+        self.typologies_from = {typ: num for num, typ in self.typologies_to.items()}
+
     @classmethod
-    def from_dict(cls, design_dict: dict):
+    def from_dict(cls, design_dict: dict, *args, **kwargs):
         design_string = cls._to_design_string(design_dict)
-        return cls(design_string)
+        return cls(design_string, *args, **kwargs)
 
     def to_phenotype(self) -> Phenotype:
         if not self.valid:
             return None
         else:
-            gfa = self.design_json["metrics"]["gfa"]
             gfa_entropy = self.design_json["metrics"]["gfa_entropy"]
-            return np.array([gfa, gfa_entropy])
+            if self.typology() in self.typologies_from:
+                typ = self.typologies_from[self.typology()]
+            else:
+                return None
+            return np.array([gfa_entropy, typ])
 
     def parse_design(self):
         """
@@ -88,7 +100,7 @@ class ArchitextGenotype(Genotype):
         valid = True
         color_regex = re.compile(rf"(" + r"|".join(list(self.visualization_dict.keys())) + rf")")
         for room in rooms.findall(layout):
-            self.design_json["layout"][room[0]] = [(x, y) for x, y in coords.findall(room[1])]
+            self.design_json["layout"][room[0]] = [(float(x), float(y)) for x, y in coords.findall(room[1])]
             try:
                 polygon = make_valid(Polygon(self.design_json["layout"][room[0]]))
                 if polygon.geom_type == "MultiPolygon":
@@ -149,12 +161,19 @@ class ArchitextGenotype(Genotype):
         prefix = f"[prompt] {design_dict['prompt']} [layout] "
         coord_strings = []
         for rm in design_dict["layout"]:
+            if rm.rstrip(string.digits) not in ArchitextGenotype.visualization_dict:
+                continue
             coord = "".join([f"({x},{y})" for x, y in design_dict["layout"][rm]])
             coord_strings.append(f"{rm}: {coord},")
         return prefix + " ".join(coord_strings) + " <|endoftext|>"
 
     def to_design_string(self) -> str:
         return self._to_design_string(self.design_json)
+
+    def to_dict(self, prompt_layout_only=True) -> dict:
+        if prompt_layout_only:
+            return {"prompt": self.design_json["prompt"], "layout": self.design_json["layout"]}
+        return self.design_json
 
     # ---- metrics ----
     def hlff(self) -> float:
@@ -170,7 +189,7 @@ class ArchitextGenotype(Genotype):
     def gfa(self) -> float:
         if self.valid:
             polygons = self.design_polygons
-            gfa = np.array([poly.area/14.2 for poly in polygons]).sum()
+            gfa = np.array([poly.area / 14.2 for poly in polygons]).sum()
             return gfa
         else:
             return float("nan")
@@ -234,4 +253,3 @@ class ArchitextGenotype(Genotype):
         nx.relabel.relabel_nodes(graph, labels, copy=False)
         return graph
     """
-
