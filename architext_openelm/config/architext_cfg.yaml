@@ -1,5 +1,4 @@
 model: architext/gptj-162M
-#checkpoints_dir: .
 cuda: True
 gpus: 1
 seed: 42
@@ -8,7 +7,7 @@ fp16: False
 top_p: 0.95
 temp: 0.85
 timeout: 5.0  # Seconds
-gen_max_len: 300
+gen_max_len: 400
 batch_size: 2
 evo_init_steps: 10
 evo_n_steps: 15
@@ -22,7 +21,8 @@ run_name: ???  # Mandatory string argument that describes the run.
 # Architext parameters
 height: 2.0
 epoch: 1
-num_generation: 2  # for every prompt, generate this many number of mutations
+#num_generation: 2  # for every prompt, generate this many number of mutations
+num_beams: 1
 mutation_model: "gpt-j"
 
 ###################################################################################################

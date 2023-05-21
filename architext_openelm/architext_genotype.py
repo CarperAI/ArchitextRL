@@ -86,7 +86,7 @@ class ArchitextGenotype(Genotype):
           - self.design_colors: a list of colors accompanying the polygons
           - self.design_merged_polygon: a merged polygon
         """
-        match = pattern.match(self.design_string)
+        match = pattern.search(self.design_string)
         self.design_json = {"prompt": "", "layout": {}, "metrics": {}, "valid": False}
         self.design_polygons = []
         self.design_colors = []
@@ -149,8 +149,10 @@ class ArchitextGenotype(Genotype):
             for j in range(i + 1, len(self.design_polygons)):
                 try:
                     if self.design_polygons[i].overlaps(self.design_polygons[j]):
-                        self.design_json["error"] = ErrorType.OverlappingPolygons
-                        return False
+                        self.design_polygons[i] = self.design_polygons[i].difference(self.design_polygons[j])
+                        assert self.design_polygons[i].geom_type == "Polygon"
+                        #self.design_json["error"] = ErrorType.OverlappingPolygons
+                        #return False
                 except:
                     self.design_json["error"] = ErrorType.OtherError
                     return False
@@ -212,10 +214,10 @@ class ArchitextGenotype(Genotype):
         else:
             return -1, -1
 
-    def get_image(self):
+    def get_image(self, bg_img=None):
         polygons = self.design_polygons
         colors = self.design_colors
-        return draw_polygons(polygons, colors)[1]
+        return draw_polygons(polygons, colors, bg_img=bg_img)[1]
 
     @property
     def valid(self):

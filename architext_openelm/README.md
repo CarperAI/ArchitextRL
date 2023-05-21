@@ -3,7 +3,15 @@ This module integrates with [OpenELM](https://github.com/CarperAI/OpenELM) by pr
 Genotype/Environment, a local inference module and an example script to run everything.
 
 ## Quick start
-To run the MAP-Elites generations using OpenELM, besides installing OpenELM, we only need to run the following.
+
+### Streamlit app
+To run the Streamlit app, besides installing `openelm` and `streamlit`, do the following
+```bash
+streamlit run streamlit_interactive.py
+```
+
+### Command line
+To run the MAP-Elites generations using OpenELM, we only need to run the following.
 ```bash
 pip install -r requirements.txt
 python3 run_elm.py --config-name=architext_cfg  run_name=test

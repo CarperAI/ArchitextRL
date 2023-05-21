@@ -49,17 +49,11 @@ class ArchitextPromptMutation(PromptModel):
         self.prompts = prompts
         self.default_height = default_height
 
-        # Put huggingface token in env variable or enter with masked input field.
-        if 'HF_TOKEN' not in os.environ:
-            self.token = getpass('Enter your HF token:')
-        else:
-            self.token = os.environ['HF_TOKEN']
-
         self.batch_size = self.cfg.batch_size
         self.device = torch.device("cuda" if torch.cuda.is_available() and self.cfg.cuda else "cpu")
 
         # Set up the tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(self.cfg.model, use_auth_token=self.token)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.cfg.model)
         self.tokenizer.padding_side = "left"
         self.tokenizer.pad_token = self.cfg.pad_token
 
@@ -67,13 +61,12 @@ class ArchitextPromptMutation(PromptModel):
         # TODO: fix data parallel
         if self.cfg.gpus > 1:
             self.model = torch.nn.DataParallel(
-                AutoModelForCausalLM.from_pretrained(self.cfg.model, use_auth_token=self.token),
+                AutoModelForCausalLM.from_pretrained(self.cfg.model),
                 device_ids=list(range(self.cfg.gpus))
             ).to(self.device)
             self.model.generate = self.model.module.generate
         else:
-            self.model = AutoModelForCausalLM.from_pretrained(self.cfg.model,
-                                                              use_auth_token=self.token).to(self.device)
+            self.model = AutoModelForCausalLM.from_pretrained(self.cfg.model).to(self.device)
 
     def mutate_genotypes(self, inputs: list[ArchitextGenotype], **kwargs) -> list[ArchitextGenotype]:
         """
@@ -104,8 +97,8 @@ class ArchitextPromptMutation(PromptModel):
                                                           return_tensors="pt",
                                                           padding=True,
                                                           truncation=True).to(self.device),
-                                         num_beams=self.cfg.num_generation,
-                                         num_return_sequences=self.cfg.num_generation,
+                                         num_beams=self.cfg.num_beams,
+                                         num_return_sequences=1,
                                          max_length=self.cfg.gen_max_len,
                                          pad_token_id=50256,
                                          **kwargs)
@@ -115,7 +108,6 @@ class ArchitextPromptMutation(PromptModel):
             ArchitextGenotype(design_string=elem,
                               height=self.default_height if parent is None else parent.height,
                               parent=parent) for elem, parent in zip(mutated_design_str, inputs)]
-
         return mutated_designs
 
 

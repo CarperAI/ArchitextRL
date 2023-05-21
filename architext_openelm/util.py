@@ -6,7 +6,7 @@ import re
 import networkx as nx
 from shapely import affinity
 from PIL import Image, ImageDraw
-save_folder = pathlib.Path(__file__).parent
+save_folder = pathlib.Path(__file__).parent / "sessions"
 base_folder = pathlib.Path(__file__).parent
 
 
@@ -14,7 +14,7 @@ def normalize(coord, offsets, scale):
     return tuple(((coord[i] + offsets[i]) * scale) for i in range(2))
 
 
-def draw_polygons(polygons, colors, im_size=(256, 256), b_color="white", fpath=None):
+def draw_polygons(polygons, colors, im_size=(256, 256), bg_color=(255, 255, 255), fpath=None, bg_img=None):
     min_x = min([min([p[0] for p in poly.exterior.coords]) for poly in polygons])
     max_x = max([max([p[0] for p in poly.exterior.coords]) for poly in polygons])
     min_y = min([min([p[1] for p in poly.exterior.coords]) for poly in polygons])
@@ -22,7 +22,10 @@ def draw_polygons(polygons, colors, im_size=(256, 256), b_color="white", fpath=N
     offsets = (min_x, min_y)
     scale = 256.0 / max(max_x - min_x, max_y - min_y)
 
-    image = Image.new("RGBA", im_size, color="white")
+    if bg_img is not None:
+        image = bg_img
+    else:
+        image = Image.new("RGBA", im_size, color=bg_color)
     draw = ImageDraw.Draw(image)
 
     for poly, color, in zip(polygons, colors):
@@ -49,7 +52,7 @@ def draw_polygons(polygons, colors, im_size=(256, 256), b_color="white", fpath=N
 
                 # image = image.transpose(Image.FLIP_TOP_BOTTOM)
 
-    if (fpath):
+    if fpath:
         image.save(fpath, format='png', quality=100, subsampling=0)
         np.save(fpath, np.array(image))
 

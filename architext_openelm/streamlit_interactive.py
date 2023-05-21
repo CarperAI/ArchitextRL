@@ -1,8 +1,5 @@
-import functools
-import json
-import pathlib
 import random
-import subprocess
+
 import numpy as np
 
 import streamlit as st
@@ -18,6 +15,8 @@ from run_elm import ArchitextELM
 from util import save_folder
 
 _lock = Lock()
+_AVAILABLE_MODELS = ["Architext GPT-J", "GPT-3.5"]
+
 
 def img_process(img_bytes):
     encoded_img = base64.b64encode(img_bytes).decode()
@@ -31,22 +30,35 @@ def image_to_byte_array(image: Image):
     return imgByteArr
 
 
-def get_imgs(elm_obj):
-    dims = elm_obj.dims
+def get_imgs(genomes, backgrounds=None):
+    dims = genomes.dims
     result = []
     for i in range(dims[0]):
         for j in range(dims[1]):
-            if elm_obj[i, j] == 0.0:
+            if genomes[i, j] == 0.0:
                 img = Image.new('RGB', (256, 256), color=(255, 255, 255))
             else:
-                img = elm_obj[i, j].get_image()
+                bg_img = backgrounds[i * dims[1] + j] if backgrounds is not None else None
+                img = genomes[i, j].get_image(bg_img=bg_img)
+
             result.append(img)
 
     return result
 
 
-def get_blank_grid():
-    return [Image.new('RGB', (256, 256), color=(255, 255, 255)) for _ in range(WIDTH * HEIGHT)]
+def get_heat_imgs(genomes):
+    dims = genomes.dims
+    hist_len = genomes.history_length
+    max_hist = max(1, np.max(np.where(genomes.top == hist_len - 1, -1, genomes.top)) + 1)
+    result = []
+    for i in range(dims[0]):
+        for j in range(dims[1]):
+            hist = genomes.top[i, j] + 1 if genomes.top[i, j] < hist_len - 1 else 0
+            intensity = int(hist / max_hist * 255)
+            img = Image.new('RGB', (256, 256), color=(255, 255 - intensity, 255 - intensity))
+            result.append(img)
+
+    return result
 
 
 def update_starts():
@@ -56,42 +68,67 @@ def update_starts():
 
 
 def _post_run():
-    with open(session_loc, "wb") as f:
-        pickle.dump({k: st.session_state[k] for k in ["elm_obj", "elm_imgs"]}, f)
+    ...
+    # with open(session_loc, "wb") as f:
+    #    pickle.dump({k: st.session_state[k] for k in ["elm_obj", "elm_imgs"]}, f)
 
 
 typologies = ["1b1b", "2b1b", "3b1b", "4b1b", "2b2b", "3b2b", "4b2b", "3b3b", "4b3b", "4b4b"]
 
 # Initialize variables and state variables
-try:
-    cfg = OmegaConf.load("config/architext_gpt3.5_cfg.yaml")
-except:
-    cfg = OmegaConf.load("architext_openelm/config/architext_gpt3.5_cfg.yaml")
 
-WIDTH, HEIGHT, Y_STEP = 5, 5, 0.1
-# todo: multiple dims for map?
-cfg.behavior_n_bins = WIDTH
+st.set_page_config(layout="wide")
+col1, col2, col3 = st.columns([2, 4, 2])
 
+# st.session_state.setdefault("width", 5)
+# st.session_state.setdefault("height", 5)
+st.session_state.setdefault("map_size", 5)
+st.session_state.setdefault("y_step", 0.1)
+
+
+def get_blank_grid():
+    WIDTH, HEIGHT = st.session_state["map_size"], st.session_state["map_size"]
+    return [Image.new('RGB', (256, 256), color=(255, 255, 255)) for _ in range(WIDTH * HEIGHT)]
+
+
+st.session_state.setdefault("model", "Architext GPT-J")
 st.session_state.setdefault("x_start", 0)
 st.session_state.setdefault("y_start", 1.0)
 st.session_state.setdefault("session_id",
                             "".join([random.choice("abcdefghijklmnopqrstuvwxyz0123456789") for _ in range(5)]))
 st.session_state.setdefault("elm_imgs",
-                            [get_blank_grid()]
+                            get_blank_grid()
                             )
+st.session_state.setdefault("heat_imgs",
+                            get_blank_grid())
 st.session_state.setdefault("elm_obj", None)
 st.session_state.setdefault("last_msg", "")
 
 update_starts()
 
+
+def get_cfg():
+    model = st.session_state["model"]
+    if model == "Architext GPT-J":
+        try:
+            cfg = OmegaConf.load("config/architext_cfg.yaml")
+        except:
+            cfg = OmegaConf.load("architext_openelm/config/architext_cfg.yaml")
+    elif model == "GPT-3.5":
+        try:
+            cfg = OmegaConf.load("config/architext_gpt3.5_cfg.yaml")
+        except:
+            cfg = OmegaConf.load("architext_openelm/config/architext_gpt3.5_cfg.yaml")
+    else:
+        raise ValueError("Model not supported")
+    cfg.behavior_n_bins = st.session_state["map_size"]
+
+    return cfg
+
+
 # create folder sessions/ if not exist
 if not os.path.exists("sessions"):
     os.makedirs("sessions")
-session_loc = "sessions/" + st.session_state["session_id"] + ".pkl"
-if os.path.exists(session_loc):
-    with open(session_loc, "rb") as f:
-        loaded_state = pickle.load(f)
-        st.session_state.update(loaded_state)
 
 
 def update_elm_obj(elm_obj, init_step, mutate_step, batch_size):
@@ -108,15 +145,22 @@ def update_elm_obj(elm_obj, init_step, mutate_step, batch_size):
 def get_elm_obj(old_elm_obj=None):
     x_start = st.session_state["x_start"]
     y_start = st.session_state["y_start"]
+    WIDTH, HEIGHT, Y_STEP = st.session_state["map_size"], st.session_state["map_size"], st.session_state["y_step"]
     behavior_mode = {'genotype_ndim': 2,
                      'genotype_space': np.array([[y_start, y_start + HEIGHT * Y_STEP], [x_start, x_start + WIDTH]]).T
                      }
 
-    elm_obj = ArchitextELM(cfg, behavior_mode=behavior_mode)
+    elm_obj = ArchitextELM(get_cfg(), behavior_mode=behavior_mode)
     if old_elm_obj is not None:
         elm_obj.map_elites.import_genomes(old_elm_obj.map_elites.export_genomes())
 
     return elm_obj
+
+
+def refresh_elm_obj():
+    st.session_state["elm_obj"] = get_elm_obj(st.session_state["elm_obj"])
+    st.session_state["elm_imgs"] = get_imgs(st.session_state["elm_obj"].map_elites.genomes)
+    st.session_state["heat_imgs"] = get_heat_imgs(st.session_state["elm_obj"].map_elites.genomes)
 
 
 def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: float, placeholder=None):
@@ -137,6 +181,7 @@ def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: floa
     st.session_state["elm_imgs"] = [get_imgs(elm_obj.map_elites.genomes)]
     _post_run()
     save()
+    st.experimental_rerun()
 
 
 def export(map_elites):
@@ -146,6 +191,7 @@ def export(map_elites):
         "history": map_elites.history,
         "x_start": st.session_state["x_start"],
         "y_start": st.session_state["y_start"],
+        "y_step": st.session_state["y_step"]
     }
 
 
@@ -156,17 +202,18 @@ def save():
 
     with open(str(save_folder / f'saved_{st.session_state["session_id"]}.pkl'), 'wb') as f:
         pickle.dump(export(elm_obj.map_elites), f)
-    st.experimental_rerun()
+    # st.experimental_rerun()
 
 
 def load(api_key):
     os.environ["OPENAI_API_KEY"] = api_key
+
     try:
         with open(str(save_folder / f'saved_{st.session_state["session_id"]}.pkl'), 'rb') as f:
             loaded_state = pickle.load(f)
-        recycled, genomes, history, x_start, y_start = \
+        recycled, genomes, history, x_start, y_start, map_y_step = \
             loaded_state["recycled"], loaded_state["genomes"], loaded_state["history"], \
-            loaded_state["x_start"], loaded_state["y_start"]
+            loaded_state["x_start"], loaded_state["y_start"], loaded_state.get('y_step', 0.1)
         st.session_state["x_start"] = x_start
         st.session_state["y_start"] = y_start
 
@@ -174,10 +221,8 @@ def load(api_key):
         st.session_state["last_msg"] = f"Error reading the files. Error message: {str(e)}"
         return
 
-    if genomes.dims != (WIDTH, HEIGHT):
-        last_msg = f"Map size mismatch. Got {genomes.dims} != {(WIDTH, HEIGHT)}"
-        st.session_state["last_msg"] = last_msg
-        return
+    assert genomes.dims[0] == genomes.dims[1], "Map size must be square"
+    st.session_state["last_msg"] = f"Map size:  {genomes.dims}"
 
     st.session_state["elm_obj"] = get_elm_obj(None)
 
@@ -188,9 +233,12 @@ def load(api_key):
     st.session_state["elm_imgs"] = [get_imgs(elm_obj.map_elites.genomes)]
 
     _post_run()
+    return genomes.dims[0], map_y_step
 
 
 def recenter():
+    WIDTH, HEIGHT, Y_STEP = st.session_state["map_size"], st.session_state["map_size"], st.session_state["y_step"]
+
     last_clicked = st.session_state.get("last_clicked", -1)
     if last_clicked < 0 or last_clicked >= WIDTH * HEIGHT:
         return
@@ -209,15 +257,20 @@ def recenter():
 
     st.session_state["last_clicked"] = new_y * WIDTH + new_x
 
-    st.session_state["elm_obj"] = get_elm_obj(st.session_state["elm_obj"])
-    st.session_state["elm_imgs"] = [get_imgs(st.session_state["elm_obj"].map_elites.genomes)]
+    refresh_elm_obj()
+
+
+def upload_submit():
+    with _lock:
+        bytes_data = st.session_state.file_uploader.getvalue()
+        with open(save_path, "wb") as f:
+            f.write(bytes_data)
+        new_size, new_y_step = load(api_key)
+        st.session_state.map_size = new_size
+        st.session_state.y_step = new_y_step
 
 
 # ----- Components and rendering -----
-
-
-st.set_page_config(layout="wide")
-col1, col2, col3 = st.columns([2, 4, 2])
 
 st.write("# Architext interactive map")
 st.write("## How it works")
@@ -239,7 +292,20 @@ st.write("- `Load the map` button will show if you have a saved map. It loads fr
 st.write("- Or you can upload your local map through the file uploader. ")
 
 with col1:
-    api_key = st.text_input("OpenAI API")
+    size_slider_placeholder = st.empty()
+    step_slider_placeholder = st.empty()
+
+    index = 0
+    for i, m in enumerate(_AVAILABLE_MODELS):
+        if st.session_state["model"] == m:
+            index = i
+    model = st.radio("Model", _AVAILABLE_MODELS, index=index)
+
+    if model == "GPT-3.5":
+        api_key = st.text_input("OpenAI API Key")  # we don't even save the api key in the session state
+    else:
+        api_key = ""
+
     init_step = st.number_input("Init Step", value=1)
     mutate_step = st.number_input("Mutate Step", value=1)
     batch_size = st.number_input("Batch Size", value=2)
@@ -247,57 +313,60 @@ with col1:
     save_path = save_folder / f'saved_{st.session_state["session_id"]}.pkl'
 
     run = st.button("Run")
-    do_recenter = st.button("Re-center")
+    do_recenter = st.button("Re-center", on_click=recenter)
+
     with st.form("file uploader", clear_on_submit=True):
-        uploaded_file = st.file_uploader("Upload your map", type=["pkl"])
-        submitted = st.form_submit_button("Upload")
+        uploaded_file = st.file_uploader("Upload your map", type=["pkl"], key="file_uploader")
+        submitted = st.form_submit_button("Upload", on_click=upload_submit)
 
-        if submitted and uploaded_file is not None:
-            with _lock:
-                bytes_data = uploaded_file.getvalue()
-                with open(save_path, "wb") as f:
-                    f.write(bytes_data)
-                load(api_key)
-                st.experimental_rerun()
+    # `upload_submit` changes sliders. Therefore, they need to be instantiated after
+    with size_slider_placeholder:
+        map_size = st.slider("Map size", min_value=3, max_value=10, key="map_size",
+                             value=5, step=1, on_change=refresh_elm_obj)
+    with step_slider_placeholder:
+        y_step = st.slider("y_step", min_value=0.1, max_value=1.0, key="y_step",
+                           value=0.1, step=0.1, on_change=refresh_elm_obj())
 
-    if os.path.exists(save_path):
-        do_load = st.button("Load the map")
-    else:
-        do_load = False
-    do_save = st.button("Save the map")
-    if os.path.exists(save_path):
-        with open(save_path, "rb") as file:
-            st.download_button(
-                label="Download the map",
-                data=file,
-                file_name=f'saved_{st.session_state["session_id"]}.pkl',
-            )
-
-
-if do_load:
-    load(api_key)
-
-if do_save:
     save()
-
-if do_recenter:
-    recenter()
+    with open(save_path, "rb") as file:
+        st.download_button(
+            label="Download the map",
+            data=file,
+            file_name=f'saved_{st.session_state["session_id"]}.pkl',
+        )
 
 with col2:
-    assert st.session_state["x_start"] + WIDTH <= len(typologies)
+    map_type = st.radio("Map type", ["Genomes", "Heat map"], index=0, horizontal=True)
+    # Overlay mode is not supported yet... How do we make it look nice?
+    #if map_type == "Overlay":
+        #imgs = get_imgs(st.session_state["elm_obj"].map_elites.genomes, backgrounds=st.session_state["heat_imgs"])
+        #imgs = [PIL.Image.blend(img1, img2, 0.5) for img1, img2 in zip(st.session_state["elm_imgs"], st.session_state["heat_imgs"])]
+    if map_type == "Heat map":
+        imgs = st.session_state["heat_imgs"]
+    elif map_type == "Genomes":
+        imgs = st.session_state["elm_imgs"]
+
+    if st.session_state["x_start"] + st.session_state["map_size"] > len(typologies):
+        # out-of-bound can happen the x_start is non-zero and the map_size slider is changed to a big number
+        assert st.session_state["map_size"] <= len(typologies)
+        st.session_state["x_start"] = len(typologies) - st.session_state["map_size"]
+
     pbar_placeholder = st.empty()
     with pbar_placeholder:
         clicked = st_grid(
-            [img_process(image_to_byte_array(img.convert('RGB'))) for img in st.session_state["elm_imgs"][0]],
-            titles=[f"Image #{str(i)}" for i in range(len(st.session_state["elm_imgs"][0]))],
+            [img_process(image_to_byte_array(img.convert('RGB'))) for img in imgs],
+            titles=[f"Image #{str(i)}" for i in range(len(imgs))],
             div_style={"justify-content": "center", "width": "650px", "overflow": "auto"},
             table_style={"justify-content": "center", "width": "100%"},
             img_style={"cursor": "pointer"},
-            num_cols=WIDTH,
-            col_labels=typologies[st.session_state["x_start"]: st.session_state["x_start"] + WIDTH],
-            row_labels=["{:.2f}".format(i * Y_STEP + st.session_state["y_start"]) for i in range(HEIGHT)],
+            num_cols=st.session_state["map_size"],
+            col_labels=typologies[
+                       st.session_state["x_start"]: st.session_state["x_start"] + st.session_state["map_size"]],
+            row_labels=["{:.2f}".format(i * st.session_state["y_step"] + st.session_state["y_start"]) for i in
+                        range(st.session_state["map_size"])],
             selected=int(st.session_state.get("last_clicked", -1)),
         )
+
 
 with col3:
     if "last_msg" in st.session_state:
@@ -317,8 +386,8 @@ with col3:
         st.write(f"Max fitness: {st.session_state['elm_obj'].map_elites.fitnesses.maximum}")
 
         if "last_clicked" in st.session_state and st.session_state["last_clicked"] != -1:
-            last_x = st.session_state["last_clicked"] % WIDTH
-            last_y = st.session_state["last_clicked"] // WIDTH
+            last_x = st.session_state["last_clicked"] % st.session_state["map_size"]
+            last_y = st.session_state["last_clicked"] // st.session_state["map_size"]
             genome = st.session_state["elm_obj"].map_elites.genomes[(last_y, last_x)]
             if genome != 0.0:
                 st.write(genome.typologies_from[genome.typology()])
@@ -328,11 +397,9 @@ if run:
     with _lock:
         run_elm(api_key, init_step, mutate_step, batch_size, placeholder=pbar_placeholder)
 
-
 if clicked != "" and clicked != -1:
     st.session_state["last_clicked"] = int(clicked)
     st.experimental_rerun()
 
 _post_run()
 st.session_state["last_msg"] = ""
-
