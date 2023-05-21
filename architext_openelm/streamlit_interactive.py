@@ -1,7 +1,5 @@
 import random
-
 import numpy as np
-
 import streamlit as st
 from PIL import Image
 from grid import st_grid
@@ -103,6 +101,8 @@ st.session_state.setdefault("heat_imgs",
                             get_blank_grid())
 st.session_state.setdefault("elm_obj", None)
 st.session_state.setdefault("last_msg", "")
+st.session_state.setdefault("last_clicked", -1)
+st.session_state.setdefault("api_key", "")
 
 update_starts()
 
@@ -153,12 +153,14 @@ def get_elm_obj(old_elm_obj=None):
     elm_obj = ArchitextELM(get_cfg(), behavior_mode=behavior_mode)
     if old_elm_obj is not None:
         elm_obj.map_elites.import_genomes(old_elm_obj.map_elites.export_genomes())
-
+    save()
     return elm_obj
 
 
 def refresh_elm_obj():
     st.session_state["elm_obj"] = get_elm_obj(st.session_state["elm_obj"])
+    if st.session_state.get("elm_obj", None) is None:
+        return
     st.session_state["elm_imgs"] = get_imgs(st.session_state["elm_obj"].map_elites.genomes)
     st.session_state["heat_imgs"] = get_heat_imgs(st.session_state["elm_obj"].map_elites.genomes)
 
@@ -166,7 +168,7 @@ def refresh_elm_obj():
 def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: float, placeholder=None):
     os.environ["OPENAI_API_KEY"] = api_key
 
-    if st.session_state["elm_obj"] is None:
+    if st.session_state.get("elm_obj", None) is None:
         st.session_state["elm_obj"] = get_elm_obj()
 
     elm_obj = st.session_state["elm_obj"]
@@ -179,9 +181,19 @@ def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: floa
     elm_obj.run(progress_bar=pbar)
 
     st.session_state["elm_imgs"] = [get_imgs(elm_obj.map_elites.genomes)]
+    if st.session_state["discard_recycled"]:
+        elm_obj.map_elites.recycled = []
     _post_run()
     save()
-    st.experimental_rerun()
+
+
+def run():
+    with _lock:
+        run_elm(st.session_state["api_key"],
+                st.session_state["init_step"],
+                st.session_state["mutate_step"],
+                st.session_state["batch_size"],
+                placeholder=pbar_placeholder)
 
 
 def export(map_elites):
@@ -196,13 +208,12 @@ def export(map_elites):
 
 
 def save():
-    if st.session_state["elm_obj"] is None:
+    if st.session_state.get("elm_obj", None) is None:
         return
     elm_obj = st.session_state["elm_obj"]
 
     with open(str(save_folder / f'saved_{st.session_state["session_id"]}.pkl'), 'wb') as f:
         pickle.dump(export(elm_obj.map_elites), f)
-    # st.experimental_rerun()
 
 
 def load(api_key):
@@ -265,7 +276,7 @@ def upload_submit():
         bytes_data = st.session_state.file_uploader.getvalue()
         with open(save_path, "wb") as f:
             f.write(bytes_data)
-        new_size, new_y_step = load(api_key)
+        new_size, new_y_step = load(st.session_state["api_key"])
         st.session_state.map_size = new_size
         st.session_state.y_step = new_y_step
 
@@ -300,19 +311,19 @@ with col1:
         if st.session_state["model"] == m:
             index = i
     model = st.radio("Model", _AVAILABLE_MODELS, index=index)
+    discard_recycled = st.checkbox("Discard out-of-bound genomes", value=True, key="discard_recycled")
 
+    # Note that we don't even save the api key in the session state
     if model == "GPT-3.5":
-        api_key = st.text_input("OpenAI API Key")  # we don't even save the api key in the session state
-    else:
-        api_key = ""
+        api_key = st.text_input("OpenAI API Key", key="api_key")
 
-    init_step = st.number_input("Init Step", value=1)
-    mutate_step = st.number_input("Mutate Step", value=1)
-    batch_size = st.number_input("Batch Size", value=2)
+    init_step = st.number_input("Init Step", value=1, key="init_step")
+    mutate_step = st.number_input("Mutate Step", value=1, key="mutate_step")
+    batch_size = st.number_input("Batch Size", value=2, key="batch_size")
 
     save_path = save_folder / f'saved_{st.session_state["session_id"]}.pkl'
 
-    run = st.button("Run")
+    run = st.button("Run", on_click=run)
     do_recenter = st.button("Re-center", on_click=recenter)
 
     with st.form("file uploader", clear_on_submit=True):
@@ -327,13 +338,13 @@ with col1:
         y_step = st.slider("y_step", min_value=0.1, max_value=1.0, key="y_step",
                            value=0.1, step=0.1, on_change=refresh_elm_obj())
 
-    save()
-    with open(save_path, "rb") as file:
-        st.download_button(
-            label="Download the map",
-            data=file,
-            file_name=f'saved_{st.session_state["session_id"]}.pkl',
-        )
+    if os.path.exists(save_path):
+        with open(save_path, "rb") as file:
+            st.download_button(
+                label="Download the map",
+                data=file,
+                file_name=f'saved_{st.session_state["session_id"]}.pkl',
+            )
 
 with col2:
     map_type = st.radio("Map type", ["Genomes", "Heat map"], index=0, horizontal=True)
@@ -365,7 +376,10 @@ with col2:
             row_labels=["{:.2f}".format(i * st.session_state["y_step"] + st.session_state["y_start"]) for i in
                         range(st.session_state["map_size"])],
             selected=int(st.session_state.get("last_clicked", -1)),
+            key="last_clicked",
+            default=-1,
         )
+        print(clicked)
 
 
 with col3:
@@ -393,13 +407,6 @@ with col3:
                 st.write(genome.typologies_from[genome.typology()])
                 st.json(genome.design_json)
 
-if run:
-    with _lock:
-        run_elm(api_key, init_step, mutate_step, batch_size, placeholder=pbar_placeholder)
-
-if clicked != "" and clicked != -1:
-    st.session_state["last_clicked"] = int(clicked)
-    st.experimental_rerun()
 
 _post_run()
 st.session_state["last_msg"] = ""
