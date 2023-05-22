@@ -65,6 +65,13 @@ def update_starts():
         st.session_state["y_start"] = st.session_state["elm_obj"].environment.behavior_mode["genotype_space"][0, 0]
 
 
+def _discard_recycled():
+    elm_obj = st.session_state.get("elm_obj", None)
+    if elm_obj is not None and st.session_state.get("discard_recycled", False):
+        elm_obj.map_elites.recycled = [None] * len(elm_obj.map_elites.recycled)
+        elm_obj.map_elites.recycled_count = 0
+
+
 def _collect_genomes(elm_obj):
     dims = elm_obj.map_elites.genomes.dims
     for i in range(dims[0]):
@@ -166,6 +173,7 @@ def get_elm_obj(old_elm_obj=None):
         elm_obj.map_elites.import_genomes(old_elm_obj.map_elites.export_genomes())
     if st.session_state.get("available_genomes", []):
         elm_obj.map_elites.import_genomes(st.session_state["available_genomes"])
+    _discard_recycled()
     save()
     return elm_obj
 
@@ -193,9 +201,8 @@ def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: floa
         pbar = None
     elm_obj.run(progress_bar=pbar)
 
-    st.session_state["elm_imgs"] = [get_imgs(elm_obj.map_elites.genomes)]
-    if st.session_state["discard_recycled"]:
-        elm_obj.map_elites.recycled = []
+    st.session_state["elm_imgs"] = get_imgs(elm_obj.map_elites.genomes)
+    _discard_recycled()
     _collect_genomes(elm_obj)
     _post_run()
     save()
@@ -215,6 +222,7 @@ def export(map_elites):
         "recycled": map_elites.recycled,
         "genomes": map_elites.genomes,
         "history": map_elites.history,
+        "available_genomes": st.session_state["available_genomes"],
         "x_start": st.session_state["x_start"],
         "y_start": st.session_state["y_start"],
         "y_step": st.session_state["y_step"]
@@ -236,8 +244,9 @@ def load(api_key):
     try:
         with open(str(save_folder / f'saved_{st.session_state["session_id"]}.pkl'), 'rb') as f:
             loaded_state = pickle.load(f)
-        recycled, genomes, history, x_start, y_start, map_y_step = \
+        recycled, genomes, history, available_genomes, x_start, y_start, map_y_step = \
             loaded_state["recycled"], loaded_state["genomes"], loaded_state["history"], \
+            loaded_state.get("available_genomes", []), \
             loaded_state["x_start"], loaded_state["y_start"], loaded_state.get('y_step', 0.1)
         st.session_state["x_start"] = x_start
         st.session_state["y_start"] = y_start
@@ -248,7 +257,7 @@ def load(api_key):
 
     assert genomes.dims[0] == genomes.dims[1], "Map size must be square"
     st.session_state["last_msg"] = f"Map size:  {genomes.dims}"
-
+    st.session_state["available_genomes"] = available_genomes
     st.session_state["elm_obj"] = get_elm_obj(None)
 
     elm_obj = st.session_state["elm_obj"]
@@ -407,7 +416,7 @@ with col3:
         st.write(f"Total Tokens: {st.session_state['tokens']}")
 
     if st.session_state.get("elm_obj", None) is not None:
-        st.write(f"Generated in this session: {st.session_state['available_genomes']}")
+        st.write(f"Generated in this session: {len(st.session_state['available_genomes'])}")
         st.write(f"Niches filled: {st.session_state['elm_obj'].map_elites.fitnesses.niches_filled}")
         st.write(
             f"Objects in recycle queue: {sum(obj is not None for obj in st.session_state['elm_obj'].map_elites.recycled)}")
