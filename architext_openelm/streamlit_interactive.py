@@ -22,10 +22,10 @@ def img_process(img_bytes):
 
 
 def image_to_byte_array(image: Image):
-    imgByteArr = io.BytesIO()
-    image.save(imgByteArr, format="jpeg")
-    imgByteArr = imgByteArr.getvalue()
-    return imgByteArr
+    img_byte_arr = io.BytesIO()
+    image.save(img_byte_arr, format="jpeg")
+    img_byte_arr = img_byte_arr.getvalue()
+    return img_byte_arr
 
 
 def get_imgs(genomes, backgrounds=None):
@@ -67,19 +67,13 @@ def update_starts():
 
 def _discard_recycled(elm_obj):
     if elm_obj is not None and st.session_state.get("discard_recycled", False):
-        st.session_state["last_msg"] = f"{elm_obj.map_elites.recycled_count} genomes discarded (either out-of-bound or invalid)"
         elm_obj.map_elites.recycled = [None] * len(elm_obj.map_elites.recycled)
         elm_obj.map_elites.recycled_count = 0
 
 
 def _collect_genomes(elm_obj):
-    dims = elm_obj.map_elites.genomes.dims
-    for i in range(dims[0]):
-        for j in range(dims[1]):
-            genome = elm_obj.map_elites.genomes[i, j]
-            if genome != 0.0 and genome is not None:
-                if genome not in st.session_state["available_genomes"]:
-                    st.session_state["available_genomes"].append(genome)
+    if elm_obj is not None:
+        st.session_state["available_genomes"].extend(elm_obj.map_elites.export_genomes(include_recycled=False))
 
 
 def _post_run():
@@ -177,12 +171,12 @@ def _need_reload(elm_obj, x_start, y_start, width, height, y_step) -> bool:
 def get_elm_obj(old_elm_obj=None):
     x_start = st.session_state["x_start"]
     y_start = st.session_state["y_start"]
-    WIDTH, HEIGHT, Y_STEP = st.session_state["map_size"], st.session_state["map_size"], st.session_state["y_step"]
+    width, height, y_step = st.session_state["map_size"], st.session_state["map_size"], st.session_state["y_step"]
     behavior_mode = {'genotype_ndim': 2,
-                     'genotype_space': np.array([[y_start, y_start + HEIGHT * Y_STEP], [x_start, x_start + WIDTH]]).T
+                     'genotype_space': np.array([[y_start, y_start + height * y_step], [x_start, x_start + width]]).T
                      }
 
-    if not _need_reload(st.session_state.get("elm_obj", None), x_start, y_start, WIDTH, HEIGHT, Y_STEP):
+    if not _need_reload(st.session_state.get("elm_obj", None), x_start, y_start, width, height, y_step):
         return st.session_state["elm_obj"]
 
     elm_obj = ArchitextELM(get_cfg(), behavior_mode=behavior_mode)
@@ -454,3 +448,6 @@ with col3:
 
 _post_run()
 st.session_state["last_msg"] = ""
+
+for g in st.session_state["available_genomes"]:
+    print(g.design_json["metrics"])

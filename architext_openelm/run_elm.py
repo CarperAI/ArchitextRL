@@ -31,7 +31,7 @@ class MyMAPElites(MAPElites):
 
         return tuple(np.digitize(x, bins) for x, bins in zip(b, self.bins))
 
-    def export_genomes(self):
+    def export_genomes(self, include_recycled=True):
         """
         Exporting genomes without regard of orders.
 
@@ -40,9 +40,11 @@ class MyMAPElites(MAPElites):
         """
         results = []
         for obj in self.genomes.array.flatten():
-            if obj != 0.0:  # todo: Worry that this might not work if fill_value is not 0.0. We might need to redesign some stuff.
+            if obj != 0.0:  # todo: Worry that this might not work if fill_value is not 0.0. We might need to redesign.
                 results.append(obj)
-        results.extend(self.recycled[:self.recycled_count])
+
+        if include_recycled:
+            results.extend(self.recycled[:self.recycled_count])
 
         return results
 
