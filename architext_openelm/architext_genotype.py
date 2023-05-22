@@ -167,6 +167,8 @@ class ArchitextGenotype(Genotype):
                 continue
             coord = "".join([f"({x},{y})" for x, y in design_dict["layout"][rm]])
             coord_strings.append(f"{rm}: {coord},")
+        if coord_strings:  # remove the last comma
+            coord_strings[-1] = coord_strings[-1][:-1]
         return prefix + " ".join(coord_strings) + " <|endoftext|>"
 
     def to_design_string(self) -> str:
@@ -198,9 +200,10 @@ class ArchitextGenotype(Genotype):
 
     def gfa_entropy(self) -> float:
         if self.valid:
-            room_gfa = [rm.area for rm in self.design_polygons]
-            gfa_entropy = calc_entropy(room_gfa)
-            return gfa_entropy
+            room_areas = np.array([rm.area for rm in self.design_polygons])
+            room_area_perc = room_areas / room_areas.sum()
+            entropy = -np.sum(room_area_perc * np.log(room_area_perc))
+            return entropy
         else:
             return float("nan")
 

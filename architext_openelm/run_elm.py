@@ -61,7 +61,7 @@ class MyMAPElites(MAPElites):
             max_fitness = -np.inf
 
         for individual in genotypes:
-            individual = ArchitextGenotype.from_dict(individual.design_json)
+            #individual = ArchitextGenotype.from_dict(individual.design_json)
             fitness = self.env.fitness(individual)
             if np.isinf(fitness):
                 continue
