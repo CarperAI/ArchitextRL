@@ -82,7 +82,6 @@ class Grid extends StreamlitComponentBase<State> {
     }
 
     public modifyCell = (prev: number, target: number): State => {
-        console.log(prev, target, this.state.Selected)
         let elem = document.getElementById("img_" + prev.toString())
         if (elem != null)
             elem.className = "unselected"

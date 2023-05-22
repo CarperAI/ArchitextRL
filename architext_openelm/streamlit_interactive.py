@@ -65,6 +65,16 @@ def update_starts():
         st.session_state["y_start"] = st.session_state["elm_obj"].environment.behavior_mode["genotype_space"][0, 0]
 
 
+def _collect_genomes(elm_obj):
+    dims = elm_obj.map_elites.genomes.dims
+    for i in range(dims[0]):
+        for j in range(dims[1]):
+            genome = elm_obj.map_elites.genomes[i, j]
+            if genome != 0.0 and genome is not None:
+                if genome not in st.session_state["available_genomes"]:
+                    st.session_state["available_genomes"].append(genome.name)
+
+
 def _post_run():
     ...
     # with open(session_loc, "wb") as f:
@@ -103,6 +113,7 @@ st.session_state.setdefault("elm_obj", None)
 st.session_state.setdefault("last_msg", "")
 st.session_state.setdefault("last_clicked", -1)
 st.session_state.setdefault("api_key", "")
+st.session_state.setdefault("available_genomes", [])  # save all genomes that show up in the map at least once
 
 update_starts()
 
@@ -153,6 +164,7 @@ def get_elm_obj(old_elm_obj=None):
     elm_obj = ArchitextELM(get_cfg(), behavior_mode=behavior_mode)
     if old_elm_obj is not None:
         elm_obj.map_elites.import_genomes(old_elm_obj.map_elites.export_genomes())
+    elm_obj.map_elites.import_genomes(st.session_state["available_genomes"])
     save()
     return elm_obj
 
@@ -183,6 +195,7 @@ def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: floa
     st.session_state["elm_imgs"] = [get_imgs(elm_obj.map_elites.genomes)]
     if st.session_state["discard_recycled"]:
         elm_obj.map_elites.recycled = []
+    _collect_genomes(elm_obj)
     _post_run()
     save()
 
@@ -317,9 +330,9 @@ with col1:
     if model == "GPT-3.5":
         api_key = st.text_input("OpenAI API Key", key="api_key")
 
-    init_step = st.number_input("Init Step", value=1, key="init_step")
-    mutate_step = st.number_input("Mutate Step", value=1, key="mutate_step")
-    batch_size = st.number_input("Batch Size", value=2, key="batch_size")
+    st.number_input("Init Step", value=1, key="init_step")
+    st.number_input("Mutate Step", value=1, key="mutate_step")
+    st.number_input("Batch Size", value=2, key="batch_size")
 
     save_path = save_folder / f'saved_{st.session_state["session_id"]}.pkl'
 
@@ -379,7 +392,6 @@ with col2:
             key="last_clicked",
             default=-1,
         )
-        print(clicked)
 
 
 with col3:
@@ -394,6 +406,7 @@ with col3:
         st.write(f"Total Tokens: {st.session_state['tokens']}")
 
     if st.session_state.get("elm_obj", None) is not None:
+        st.write(f"Generated in this session: {st.session_state['available_genomes']}")
         st.write(f"Niches filled: {st.session_state['elm_obj'].map_elites.fitnesses.niches_filled}")
         st.write(
             f"Objects in recycle queue: {sum(obj is not None for obj in st.session_state['elm_obj'].map_elites.recycled)}")
