@@ -160,6 +160,20 @@ def update_elm_obj(elm_obj, init_step, mutate_step, batch_size):
     elm_obj.map_elites.env.batch_size = batch_size
 
 
+def _need_reload(elm_obj, x_start, y_start, width, height, y_step) -> bool:
+    if elm_obj is None:
+        return True
+    if elm_obj.environment.behavior_mode["genotype_space"][0, 1] != y_start + height * y_step:
+        return True
+    if elm_obj.environment.behavior_mode["genotype_space"][0, 0] != y_start:
+        return True
+    if elm_obj.environment.behavior_mode["genotype_space"][1, 1] != x_start + width:
+        return True
+    if elm_obj.environment.behavior_mode["genotype_space"][1, 0] != x_start:
+        return True
+    return False
+
+
 def get_elm_obj(old_elm_obj=None):
     x_start = st.session_state["x_start"]
     y_start = st.session_state["y_start"]
@@ -167,6 +181,9 @@ def get_elm_obj(old_elm_obj=None):
     behavior_mode = {'genotype_ndim': 2,
                      'genotype_space': np.array([[y_start, y_start + HEIGHT * Y_STEP], [x_start, x_start + WIDTH]]).T
                      }
+
+    if not _need_reload(st.session_state.get("elm_obj", None), x_start, y_start, WIDTH, HEIGHT, Y_STEP):
+        return st.session_state["elm_obj"]
 
     elm_obj = ArchitextELM(get_cfg(), behavior_mode=behavior_mode)
     if old_elm_obj is not None:
@@ -210,11 +227,14 @@ def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: floa
 
 def run():
     with _lock:
-        run_elm(st.session_state["api_key"],
-                st.session_state["init_step"],
-                st.session_state["mutate_step"],
-                st.session_state["batch_size"],
-                placeholder=pbar_placeholder)
+        try:
+            run_elm(st.session_state["api_key"],
+                    st.session_state["init_step"],
+                    st.session_state["mutate_step"],
+                    st.session_state["batch_size"],
+                    placeholder=pbar_placeholder)
+        except Exception as e:
+            st.session_state["last_msg"] = str(e)
 
 
 def export(map_elites):
@@ -334,7 +354,7 @@ with col1:
         if st.session_state["model"] == m:
             index = i
     model = st.radio("Model", _AVAILABLE_MODELS, index=index)
-    discard_recycled = st.checkbox("Discard out-of-bound genomes", value=True, key="discard_recycled")
+    st.checkbox("Discard out-of-bound genomes", value=True, key="discard_recycled")
 
     # Note that we don't even save the api key in the session state
     if model == "GPT-3.5":

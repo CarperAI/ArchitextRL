@@ -78,7 +78,7 @@ class Grid extends StreamlitComponentBase<State> {
     }
 
     public is_selected = (selected: number, target: number): boolean => {
-        return (selected === target) || (this.state.Selected === target)
+        return selected === target
     }
 
     public modifyCell = (prev: number, target: number): State => {
@@ -93,6 +93,11 @@ class Grid extends StreamlitComponentBase<State> {
                 elems[i].className = "unselected"
             }
         }
+
+        elem = document.getElementById("img_" + target.toString())
+        if (elem != null)
+            elem.className = "selected"
+
         return {
             Selected: target
         }
