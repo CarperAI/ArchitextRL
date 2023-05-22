@@ -72,7 +72,7 @@ def _collect_genomes(elm_obj):
             genome = elm_obj.map_elites.genomes[i, j]
             if genome != 0.0 and genome is not None:
                 if genome not in st.session_state["available_genomes"]:
-                    st.session_state["available_genomes"].append(genome.name)
+                    st.session_state["available_genomes"].append(genome)
 
 
 def _post_run():
