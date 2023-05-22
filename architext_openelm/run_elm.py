@@ -42,7 +42,7 @@ class MyMAPElites(MAPElites):
         for obj in self.genomes.array.flatten():
             if obj != 0.0:  # todo: Worry that this might not work if fill_value is not 0.0. We might need to redesign some stuff.
                 results.append(obj)
-        results.extend([obj for obj in self.recycled if obj is not None])
+        results.extend(self.recycled[:self.recycled_count])
 
         return results
 

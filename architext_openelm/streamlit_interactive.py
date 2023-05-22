@@ -65,9 +65,9 @@ def update_starts():
         st.session_state["y_start"] = st.session_state["elm_obj"].environment.behavior_mode["genotype_space"][0, 0]
 
 
-def _discard_recycled():
-    elm_obj = st.session_state.get("elm_obj", None)
+def _discard_recycled(elm_obj):
     if elm_obj is not None and st.session_state.get("discard_recycled", False):
+        st.session_state["last_msg"] = f"{elm_obj.map_elites.recycled_count} genomes discarded (either out-of-bound or invalid)"
         elm_obj.map_elites.recycled = [None] * len(elm_obj.map_elites.recycled)
         elm_obj.map_elites.recycled_count = 0
 
@@ -219,13 +219,14 @@ def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: floa
     elm_obj.run(progress_bar=pbar)
 
     st.session_state["elm_imgs"] = get_imgs(elm_obj.map_elites.genomes)
-    _discard_recycled()
+    _discard_recycled(elm_obj)
     _collect_genomes(elm_obj)
     _post_run()
     save()
 
 
 def run():
+    # todo: Use Semaphore for models separately? GPT-J depends on GPU/RAM capacity and GPT-3.5 depends on rate limit
     with _lock:
         try:
             run_elm(st.session_state["api_key"],
@@ -439,7 +440,7 @@ with col3:
         st.write(f"Generated in this session: {len(st.session_state['available_genomes'])}")
         st.write(f"Niches filled: {st.session_state['elm_obj'].map_elites.fitnesses.niches_filled}")
         st.write(
-            f"Objects in recycle queue: {sum(obj is not None for obj in st.session_state['elm_obj'].map_elites.recycled)}")
+            f"Objects in recycle queue: {st.session_state['elm_obj'].map_elites.recycled_count}")
         st.write(f"Max fitness: {st.session_state['elm_obj'].map_elites.fitnesses.maximum}")
 
         if "last_clicked" in st.session_state and st.session_state["last_clicked"] != -1:
