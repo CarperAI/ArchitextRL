@@ -164,7 +164,8 @@ def get_elm_obj(old_elm_obj=None):
     elm_obj = ArchitextELM(get_cfg(), behavior_mode=behavior_mode)
     if old_elm_obj is not None:
         elm_obj.map_elites.import_genomes(old_elm_obj.map_elites.export_genomes())
-    elm_obj.map_elites.import_genomes(st.session_state["available_genomes"])
+    if st.session_state.get("available_genomes", []):
+        elm_obj.map_elites.import_genomes(st.session_state["available_genomes"])
     save()
     return elm_obj
 
