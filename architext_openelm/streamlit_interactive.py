@@ -190,7 +190,7 @@ def get_elm_obj(old_elm_obj=None):
         elm_obj.map_elites.import_genomes(old_elm_obj.map_elites.export_genomes())
     if st.session_state.get("available_genomes", []):
         elm_obj.map_elites.import_genomes(st.session_state["available_genomes"])
-    _discard_recycled()
+    _discard_recycled(elm_obj)
     save()
     return elm_obj
 
