@@ -1,4 +1,5 @@
 model: architext/gptj-162M
+#checkpoints_dir: .
 cuda: True
 gpus: 1
 seed: 42
