@@ -101,7 +101,7 @@ st.session_state.setdefault("y_step", 0.1)
 
 
 def get_blank_grid():
-    WIDTH, HEIGHT = st.session_state["map_size"], st.session_state["map_size"]
+    WIDTH, HEIGHT = st.session_state.get("map_size", 5), st.session_state.get("map_size", 5)
     return [Image.new('RGB', (256, 256), color=(255, 255, 255)) for _ in range(WIDTH * HEIGHT)]
 
 
@@ -287,6 +287,10 @@ def load(api_key):
 
 
 def recenter():
+    if "map_size" not in st.session_state:
+        # not initialized yet... Not sure how Streamlit works on these functions but such case does happen
+        return
+
     WIDTH, HEIGHT, Y_STEP = st.session_state["map_size"], st.session_state["map_size"], st.session_state["y_step"]
 
     last_clicked = st.session_state.get("last_clicked", -1)
