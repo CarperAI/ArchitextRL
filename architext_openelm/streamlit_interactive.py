@@ -65,6 +65,11 @@ def update_starts():
         st.session_state["y_start"] = st.session_state["elm_obj"].environment.behavior_mode["genotype_space"][0, 0]
 
 
+def _update_images(elm_obj):
+    st.session_state["elm_imgs"] = get_imgs(elm_obj.map_elites.genomes)
+    st.session_state["heat_imgs"] = get_heat_imgs(elm_obj.map_elites.genomes)
+
+
 def _discard_recycled(elm_obj):
     if elm_obj is not None and st.session_state.get("discard_recycled", False):
         elm_obj.map_elites.recycled = [None] * len(elm_obj.map_elites.recycled)
@@ -112,7 +117,7 @@ st.session_state.setdefault("heat_imgs",
                             get_blank_grid())
 st.session_state.setdefault("elm_obj", None)
 st.session_state.setdefault("last_msg", "")
-st.session_state.setdefault("last_clicked", -1)
+st.session_state.setdefault("last_clicked", (st.session_state["map_size"] + 1) * (st.session_state["map_size"] // 2))
 st.session_state.setdefault("api_key", "")
 st.session_state.setdefault("available_genomes", [])  # save all genomes that show up in the map at least once
 
@@ -184,17 +189,11 @@ def get_elm_obj(old_elm_obj=None):
         elm_obj.map_elites.import_genomes(old_elm_obj.map_elites.export_genomes())
     if st.session_state.get("available_genomes", []):
         elm_obj.map_elites.import_genomes(st.session_state["available_genomes"])
+
+    _update_images(elm_obj)
     _discard_recycled(elm_obj)
     save()
     return elm_obj
-
-
-def refresh_elm_obj():
-    st.session_state["elm_obj"] = get_elm_obj(st.session_state["elm_obj"])
-    if st.session_state.get("elm_obj", None) is None:
-        return
-    st.session_state["elm_imgs"] = get_imgs(st.session_state["elm_obj"].map_elites.genomes)
-    st.session_state["heat_imgs"] = get_heat_imgs(st.session_state["elm_obj"].map_elites.genomes)
 
 
 def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: float, placeholder=None):
@@ -212,7 +211,7 @@ def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: floa
         pbar = None
     elm_obj.run(progress_bar=pbar)
 
-    st.session_state["elm_imgs"] = get_imgs(elm_obj.map_elites.genomes)
+    _update_images(elm_obj)
     _discard_recycled(elm_obj)
     _collect_genomes(elm_obj)
     _post_run()
@@ -272,6 +271,8 @@ def load(api_key):
 
     assert genomes.dims[0] == genomes.dims[1], "Map size must be square"
     st.session_state["last_msg"] = f"Map size:  {genomes.dims}"
+    st.session_state["last_clicked"] = (genomes.dims[0] * (genomes.dims[1]) // 2) + genomes.dims[0] // 2
+
     st.session_state["available_genomes"] = available_genomes
     st.session_state["elm_obj"] = get_elm_obj(None)
 
@@ -279,7 +280,7 @@ def load(api_key):
     elm_obj.map_elites.load_maps(genomes=genomes, recycled=recycled)
     elm_obj.map_elites.history = history
 
-    st.session_state["elm_imgs"] = [get_imgs(elm_obj.map_elites.genomes)]
+    st.session_state["elm_imgs"] = get_imgs(elm_obj.map_elites.genomes)
 
     _post_run()
     return genomes.dims[0], map_y_step
@@ -306,7 +307,7 @@ def recenter():
 
     st.session_state["last_clicked"] = new_y * WIDTH + new_x
 
-    refresh_elm_obj()
+    st.session_state["elm_obj"] = get_elm_obj(st.session_state["elm_obj"])
 
 
 def upload_submit():
@@ -355,13 +356,16 @@ with col1:
     if model == "GPT-3.5":
         api_key = st.text_input("OpenAI API Key", key="api_key")
 
-    st.number_input("Init Step", value=1, key="init_step")
-    st.number_input("Mutate Step", value=1, key="mutate_step")
-    st.number_input("Batch Size", value=2, key="batch_size")
+    with st.form("parameters", clear_on_submit=False):
+        st.number_input("Init Step", value=1, key="init_step")
+        st.number_input("Mutate Step", value=1, key="mutate_step")
+        st.number_input("Batch Size", value=2, key="batch_size")
+
+        run = st.form_submit_button("Run", on_click=run)
+
 
     save_path = save_folder / f'saved_{st.session_state["session_id"]}.pkl'
 
-    run = st.button("Run", on_click=run)
     do_recenter = st.button("Re-center", on_click=recenter)
 
     with st.form("file uploader", clear_on_submit=True):
@@ -371,10 +375,10 @@ with col1:
     # `upload_submit` changes sliders. Therefore, they need to be instantiated after
     with size_slider_placeholder:
         map_size = st.slider("Map size", min_value=3, max_value=10, key="map_size",
-                             value=5, step=1, on_change=refresh_elm_obj)
+                             value=5, step=1, on_change=recenter)
     with step_slider_placeholder:
-        y_step = st.slider("y_step", min_value=0.1, max_value=1.0, key="y_step",
-                           value=0.1, step=0.1, on_change=refresh_elm_obj())
+        y_step = st.slider("y_step", min_value=0.05, max_value=0.5, key="y_step",
+                           value=0.1, step=0.05, on_change=recenter)
 
     if os.path.exists(save_path):
         with open(save_path, "rb") as file:
@@ -448,6 +452,3 @@ with col3:
 
 _post_run()
 st.session_state["last_msg"] = ""
-
-for g in st.session_state["available_genomes"]:
-    print(g.design_json["metrics"])
