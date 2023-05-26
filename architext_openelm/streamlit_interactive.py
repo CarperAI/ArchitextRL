@@ -13,7 +13,7 @@ from run_elm import ArchitextELM
 from util import save_folder
 
 _lock = Lock()
-_AVAILABLE_MODELS = ["Architext GPT-J", "GPT-3.5"]
+_AVAILABLE_MODELS = ["finetuned", "Architext GPT-J", "GPT-3.5"]
 
 
 def img_process(img_bytes):
@@ -136,6 +136,12 @@ def get_cfg():
             cfg = OmegaConf.load("config/architext_gpt3.5_cfg.yaml")
         except:
             cfg = OmegaConf.load("architext_openelm/config/architext_gpt3.5_cfg.yaml")
+    elif model == "finetuned":
+        try:
+            cfg = OmegaConf.load("config/architext_finetuned.yaml")
+        except:
+            cfg = OmegaConf.load("architext_openelm/config/architext_finetuned.yaml")
+
     else:
         raise ValueError("Model not supported")
     cfg.behavior_n_bins = st.session_state["map_size"]
@@ -198,6 +204,7 @@ def get_elm_obj(old_elm_obj=None):
 
 def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: float, placeholder=None):
     os.environ["OPENAI_API_KEY"] = api_key
+    print(get_cfg())
 
     if st.session_state.get("elm_obj", None) is None:
         st.session_state["elm_obj"] = get_elm_obj()
@@ -353,7 +360,7 @@ with col1:
     for i, m in enumerate(_AVAILABLE_MODELS):
         if st.session_state["model"] == m:
             index = i
-    model = st.radio("Model", _AVAILABLE_MODELS, index=index)
+    model = st.radio("Model", _AVAILABLE_MODELS, index=index, key="model")
     st.checkbox("Discard out-of-bound genomes", value=True, key="discard_recycled")
 
     # Note that we don't even save the api key in the session state

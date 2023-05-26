@@ -101,6 +101,7 @@ class ArchitextPromptMutation(PromptModel):
                                          num_return_sequences=1,
                                          max_length=self.cfg.gen_max_len,
                                          pad_token_id=50256,
+                                         do_sample=True,
                                          **kwargs)
 
         mutated_design_str = self.tokenizer.batch_decode(completion)
@@ -108,6 +109,7 @@ class ArchitextPromptMutation(PromptModel):
             ArchitextGenotype(design_string=elem,
                               height=self.default_height if parent is None else parent.height,
                               parent=parent) for elem, parent in zip(mutated_design_str, inputs)]
+        print(mutated_design_str)
         return mutated_designs
 
 
