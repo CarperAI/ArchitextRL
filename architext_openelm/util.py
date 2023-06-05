@@ -15,18 +15,23 @@ def normalize(coord, offsets, scale):
 
 
 def draw_polygons(polygons, colors, im_size=(256, 256), bg_color=(255, 255, 255), fpath=None, bg_img=None):
-    min_x = min([min([p[0] for p in poly.exterior.coords]) for poly in polygons])
-    max_x = max([max([p[0] for p in poly.exterior.coords]) for poly in polygons])
-    min_y = min([min([p[1] for p in poly.exterior.coords]) for poly in polygons])
-    max_y = max([max([p[1] for p in poly.exterior.coords]) for poly in polygons])
-    offsets = (min_x, min_y)
-    scale = 256.0 / max(max_x - min_x, max_y - min_y)
-
     if bg_img is not None:
         image = bg_img
     else:
         image = Image.new("RGBA", im_size, color=bg_color)
     draw = ImageDraw.Draw(image)
+    if not polygons:
+        return draw, image
+    try:
+        min_x = min([min([p[0] for p in poly.exterior.coords]) for poly in polygons])
+        max_x = max([max([p[0] for p in poly.exterior.coords]) for poly in polygons])
+        min_y = min([min([p[1] for p in poly.exterior.coords]) for poly in polygons])
+        max_y = max([max([p[1] for p in poly.exterior.coords]) for poly in polygons])
+        offsets = (min_x, min_y)
+    except:
+        return draw, image
+    scale = 256.0 / max(max_x - min_x, max_y - min_y)
+
 
     for poly, color, in zip(polygons, colors):
         shifted_poly = affinity.translate(poly, xoff=-offsets[0], yoff=-offsets[1])

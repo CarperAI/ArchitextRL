@@ -1,4 +1,5 @@
-model: architext/gptj-162M
+#model: architext/gptj-162M
+model: quintic/architext_finetuned_1 
 #checkpoints_dir: .
 cuda: True
 gpus: 1
