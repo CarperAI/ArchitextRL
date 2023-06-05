@@ -72,7 +72,7 @@ class ArchitextGenotype(Genotype):
             return None
         else:
             gfa_entropy = self.design_json["metrics"]["gfa_entropy"]
-            if self.typology() in self.typologies_from:
+            if self.typology() in self.typologies_from and not np.isnan(gfa_entropy) and not np.isinf(gfa_entropy):
                 typ = self.typologies_from[self.typology()]
             else:
                 return None
@@ -100,8 +100,8 @@ class ArchitextGenotype(Genotype):
         valid = True
         color_regex = re.compile(rf"(" + r"|".join(list(self.visualization_dict.keys())) + rf")")
         for room in rooms.findall(layout):
-            self.design_json["layout"][room[0]] = [(float(x), float(y)) for x, y in coords.findall(room[1])]
             try:
+                self.design_json["layout"][room[0]] = [(float(x), float(y)) for x, y in coords.findall(room[1])]
                 polygon = make_valid(Polygon(self.design_json["layout"][room[0]]))
                 if polygon.geom_type == "MultiPolygon":
                     polygon = list(polygon.geoms)

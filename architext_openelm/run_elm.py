@@ -144,7 +144,7 @@ class MyMAPElites(MAPElites):
             # TODO: account for the case where multiple new individuals are
             # placed in the same niche, for saving histories.
             for individual in new_individuals:
-                print(individual.design_json)
+                #print(individual.design_json)
                 fitness = self.env.fitness(individual)
                 if np.isinf(fitness):
                     continue

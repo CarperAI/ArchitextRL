@@ -107,7 +107,7 @@ def get_blank_grid():
 
 st.session_state.setdefault("model", "Architext GPT-J")
 st.session_state.setdefault("x_start", 0)
-st.session_state.setdefault("y_start", 1.0)
+st.session_state.setdefault("y_start", 1.9)
 st.session_state.setdefault("session_id",
                             "".join([random.choice("abcdefghijklmnopqrstuvwxyz0123456789") for _ in range(5)]))
 st.session_state.setdefault("elm_imgs",

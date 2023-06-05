@@ -109,7 +109,6 @@ class ArchitextPromptMutation(PromptModel):
             ArchitextGenotype(design_string=elem,
                               height=self.default_height if parent is None else parent.height,
                               parent=parent) for elem, parent in zip(mutated_design_str, inputs)]
-        print(mutated_design_str)
         return mutated_designs
 
 
