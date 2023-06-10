@@ -2,6 +2,7 @@ import random
 import numpy as np
 import streamlit as st
 from PIL import Image
+
 from grid import st_grid
 import io
 import base64
@@ -10,7 +11,7 @@ import pickle
 from omegaconf import OmegaConf
 from threading import Lock
 from run_elm import ArchitextELM
-from util import save_folder
+from util import save_folder, get_imgs
 
 _lock = Lock()
 _AVAILABLE_MODELS = ["finetuned", "Architext GPT-J", "GPT-3.5"]
@@ -26,22 +27,6 @@ def image_to_byte_array(image: Image):
     image.save(img_byte_arr, format="jpeg")
     img_byte_arr = img_byte_arr.getvalue()
     return img_byte_arr
-
-
-def get_imgs(genomes, backgrounds=None):
-    dims = genomes.dims
-    result = []
-    for i in range(dims[0]):
-        for j in range(dims[1]):
-            if genomes[i, j] == 0.0:
-                img = Image.new('RGB', (256, 256), color=(255, 255, 255))
-            else:
-                bg_img = backgrounds[i * dims[1] + j] if backgrounds is not None else None
-                img = genomes[i, j].get_image(bg_img=bg_img)
-
-            result.append(img)
-
-    return result
 
 
 def get_heat_imgs(genomes):
@@ -204,7 +189,6 @@ def get_elm_obj(old_elm_obj=None):
 
 def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: float, placeholder=None):
     os.environ["OPENAI_API_KEY"] = api_key
-    print(get_cfg())
 
     if st.session_state.get("elm_obj", None) is None:
         st.session_state["elm_obj"] = get_elm_obj()
@@ -216,7 +200,7 @@ def run_elm(api_key: str, init_step: float, mutate_step: float, batch_size: floa
         pbar = placeholder.progress(1, text="Generation in progress. Please wait.")
     else:
         pbar = None
-    elm_obj.run(progress_bar=pbar)
+    elm_obj.run(progress_bar=pbar, gif_prefix=st.session_state["session_id"])
 
     _update_images(elm_obj)
     _discard_recycled(elm_obj)
@@ -335,7 +319,8 @@ def upload_submit():
 
 st.write("# Architext interactive map")
 st.write("## How it works")
-st.write("1. Paste your OAI key (we do not save it, as you can check from our source code:"
+st.write("1. Choose the model.")
+st.write("  - If GPT-3.5, paste your OAI key (we do not save it, as you can check from our source code:"
          "https://github.com/CarperAI/ArchitextRL/tree/main/architext_openelm).")
 st.write("2. Choose the parameters for the map generation.")
 st.write("3. Click `run`.")
@@ -349,8 +334,8 @@ st.write("- `Re-center` button is the biggest player here: if you select a grid 
 st.write("- `Save` button will save the state of the map into a pickle file.")
 st.write("- `Download map` button will show if you have a saved map. "
          "It allows you to download the pkl file and keep it.")
-st.write("- `Load the map` button will show if you have a saved map. It loads from the pkl file on server.")
-st.write("- Or you can upload your local map through the file uploader. ")
+st.write("- You can also upload your local map through the file uploader. ")
+st.write("- After each run, a gif will be generated and you have the option of downloading it.")
 
 with col1:
     size_slider_placeholder = st.empty()
@@ -374,7 +359,6 @@ with col1:
 
         run = st.form_submit_button("Run", on_click=run)
 
-
     save_path = save_folder / f'saved_{st.session_state["session_id"]}.pkl'
 
     do_recenter = st.button("Re-center", on_click=recenter)
@@ -397,6 +381,13 @@ with col1:
                 label="Download the map",
                 data=file,
                 file_name=f'saved_{st.session_state["session_id"]}.pkl',
+            )
+    if os.path.exists(f"{st.session_state['session_id']}_out.gif"):
+        with open(f"{st.session_state['session_id']}_out.gif", "rb") as file:
+            st.download_button(
+                label="Download the gif",
+                data=file,
+                file_name=f'{st.session_state["session_id"]}_out.gif',
             )
 
 with col2:

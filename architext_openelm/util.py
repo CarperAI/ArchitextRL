@@ -5,7 +5,8 @@ import math
 import re
 import networkx as nx
 from shapely import affinity
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
+
 save_folder = pathlib.Path(__file__).parent / "sessions"
 base_folder = pathlib.Path(__file__).parent
 
@@ -137,3 +138,44 @@ housegan_labels = {"living_room": 1, "kitchen": 2, "bedroom": 3, "bathroom": 4, 
 regex = re.compile(r".*?\((.*?)\)")
 
 
+def get_imgs(genomes, backgrounds=None):
+    dims = genomes.dims
+    result = []
+    for i in range(dims[0]):
+        for j in range(dims[1]):
+            if genomes[i, j] == 0.0:
+                img = Image.new('RGB', (256, 256), color=(255, 255, 255))
+            else:
+                bg_img = backgrounds[i * dims[1] + j] if backgrounds is not None else None
+                img = genomes[i, j].get_image(bg_img=bg_img)
+
+            result.append(img)
+
+    return result
+
+
+def image_grid(imgs, rows, cols, text_h=50):
+    assert len(imgs) == rows * cols
+
+    horizontal = sorted([
+                    (i + 1, j + 1) for j in range(4) for i in range(4)
+                    if j <= i
+                ], key=lambda x: x[1])
+
+    w, h = imgs[0].size
+    grid = Image.new('RGBA', size=(cols * w, rows * h + text_h))
+    draw = ImageDraw.Draw(grid)
+
+    for i, img in enumerate(imgs):
+        grid.paste(img, box=(i % cols * w, i // cols * h + text_h))
+
+    _width = 2
+    for i, img in enumerate(imgs):
+        draw.rectangle(((i % cols * w - _width, i // cols * h + text_h - _width),
+                        ((i % cols + 1) * w - _width, (i // cols + 1) * h + text_h - _width),),
+                       outline=(0, 0, 0, 255), width=1)
+
+    font = ImageFont.truetype(font="jet2.ttf", size=40)
+    for i, typ in enumerate(horizontal):
+        draw.text((i * w + w // 3, 0), f"{typ[0]}B{typ[1]}B", font=font, fill=(0, 0, 0, 255), align="center")
+    return grid
