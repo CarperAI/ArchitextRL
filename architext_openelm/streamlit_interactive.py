@@ -438,6 +438,7 @@ with col3:
 
     if st.session_state.get("elm_obj", None) is not None:
         st.write(f"Generated in this session: {len(st.session_state['available_genomes'])}")
+        st.write(f"QD score: {st.session_state['elm_obj'].map_elites.fitnesses.qd_score}")
         st.write(f"Niches filled: {st.session_state['elm_obj'].map_elites.fitnesses.niches_filled}")
         st.write(
             f"Objects in recycle queue: {st.session_state['elm_obj'].map_elites.recycled_count}")
