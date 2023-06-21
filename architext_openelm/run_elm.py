@@ -12,9 +12,11 @@ from architext_env import Architext, architext_init_args
 from openelm.environments import ENVS_DICT, Genotype
 
 from architext_genotype import ArchitextGenotype
-from util import save_folder
+from util import save_folder, get_imgs, image_grid
 
 ARG_DICT = {"architext": architext_init_args}
+
+cached_imgs = []
 
 
 # TODO: Add in a few features for MapElites class. Eventually they need to be moved to OpenELM.
@@ -31,7 +33,7 @@ class MyMAPElites(MAPElites):
 
         return tuple(np.digitize(x, bins) for x, bins in zip(b, self.bins))
 
-    def export_genomes(self):
+    def export_genomes(self, include_recycled=True):
         """
         Exporting genomes without regard of orders.
 
@@ -40,9 +42,11 @@ class MyMAPElites(MAPElites):
         """
         results = []
         for obj in self.genomes.array.flatten():
-            if obj != 0.0:  # todo: Worry that this might not work if fill_value is not 0.0. We might need to redesign some stuff.
+            if obj != 0.0:  # todo: Worry that this might not work if fill_value is not 0.0. We might need to redesign.
                 results.append(obj)
-        results.extend([obj for obj in self.recycled if obj is not None])
+
+        if include_recycled:
+            results.extend(self.recycled[:self.recycled_count])
 
         return results
 
@@ -59,7 +63,7 @@ class MyMAPElites(MAPElites):
             max_fitness = -np.inf
 
         for individual in genotypes:
-            individual = ArchitextGenotype.from_dict(individual.design_json)
+            #individual = ArchitextGenotype.from_dict(individual.design_json)
             fitness = self.env.fitness(individual)
             if np.isinf(fitness):
                 continue
@@ -172,7 +176,7 @@ class MyMAPElites(MAPElites):
                 if np.isclose(max_fitness, self.env.max_fitness, atol=atol):
                     break
 
-            after_step(locals=locals())
+            after_step(local_vars=locals())
 
         self.current_max_genome = max_genome
         return str(max_genome)
@@ -211,7 +215,8 @@ class ArchitextELM:
             history_length=self.cfg.evo_history_length,
         )
 
-    def run(self, evo_init_step_scheduler=None, suffix="", save_each_epochs=False, progress_bar=None):
+    def run(self, evo_init_step_scheduler=None, suffix="", save_each_epochs=False, progress_bar=None,
+            gif_prefix=""):
         """
         Run MAPElites for self.cfg.epoch number of times. Can optionally add in an initial step scheduler
         to determine how many random steps are needed for each epoch.
@@ -224,22 +229,31 @@ class ArchitextELM:
             suffix: (Optional) filename suffix.
             save_each_epochs: (Optional) save after each epoch.
             progress_bar: (Optional) a streamlit progress bar.
+            gif_prefix: (Optional) the prefix of the gif filename.
 
         """
         if evo_init_step_scheduler is None:
             def evo_init_step_scheduler(step: int):
                 return 0
 
-        def after_step(locals):
+        def after_step(local_vars: dict):
             if progress_bar is not None:
-                progress_bar.progress((locals["n_steps"] + 1) / locals["total_steps"],
+                progress_bar.progress((local_vars["n_steps"] + 1) / local_vars["total_steps"],
                                       text="Generation in progress. Please wait.")
+            global cached_imgs
+            size = local_vars["self"].map_grid_size[0]
+            cached_imgs.append(image_grid(get_imgs(local_vars["self"].genomes), rows=size, cols=size,))
 
         for i in range(self.cfg.epoch):
             self.map_elites.search(
                 init_steps=self.cfg.evo_init_steps, total_steps=self.cfg.evo_n_steps,
                 after_step=after_step,
             )
+            global cached_imgs
+            if cached_imgs and gif_prefix:
+                cached_imgs[0].save(f"{gif_prefix}_out.gif", format='GIF', append_images=cached_imgs[1:], save_all=True, duration=500, loop=0)
+                cached_imgs = []
+
             if save_each_epochs:
                 # Histories are reset every time when `.search` is called. We have to dump and merge it.
                 with open(str(save_folder / f'recycled.pkl'), 'wb') as f:

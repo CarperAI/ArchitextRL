@@ -5,8 +5,9 @@ import math
 import re
 import networkx as nx
 from shapely import affinity
-from PIL import Image, ImageDraw
-save_folder = pathlib.Path(__file__).parent
+from PIL import Image, ImageDraw, ImageFont
+
+save_folder = pathlib.Path(__file__).parent / "sessions"
 base_folder = pathlib.Path(__file__).parent
 
 
@@ -14,16 +15,24 @@ def normalize(coord, offsets, scale):
     return tuple(((coord[i] + offsets[i]) * scale) for i in range(2))
 
 
-def draw_polygons(polygons, colors, im_size=(256, 256), b_color="white", fpath=None):
-    min_x = min([min([p[0] for p in poly.exterior.coords]) for poly in polygons])
-    max_x = max([max([p[0] for p in poly.exterior.coords]) for poly in polygons])
-    min_y = min([min([p[1] for p in poly.exterior.coords]) for poly in polygons])
-    max_y = max([max([p[1] for p in poly.exterior.coords]) for poly in polygons])
-    offsets = (min_x, min_y)
+def draw_polygons(polygons, colors, im_size=(256, 256), bg_color=(255, 255, 255), fpath=None, bg_img=None):
+    if bg_img is not None:
+        image = bg_img
+    else:
+        image = Image.new("RGBA", im_size, color=bg_color)
+    draw = ImageDraw.Draw(image)
+    if not polygons:
+        return draw, image
+    try:
+        min_x = min([min([p[0] for p in poly.exterior.coords]) for poly in polygons])
+        max_x = max([max([p[0] for p in poly.exterior.coords]) for poly in polygons])
+        min_y = min([min([p[1] for p in poly.exterior.coords]) for poly in polygons])
+        max_y = max([max([p[1] for p in poly.exterior.coords]) for poly in polygons])
+        offsets = (min_x, min_y)
+    except:
+        return draw, image
     scale = 256.0 / max(max_x - min_x, max_y - min_y)
 
-    image = Image.new("RGBA", im_size, color="white")
-    draw = ImageDraw.Draw(image)
 
     for poly, color, in zip(polygons, colors):
         shifted_poly = affinity.translate(poly, xoff=-offsets[0], yoff=-offsets[1])
@@ -49,7 +58,7 @@ def draw_polygons(polygons, colors, im_size=(256, 256), b_color="white", fpath=N
 
                 # image = image.transpose(Image.FLIP_TOP_BOTTOM)
 
-    if (fpath):
+    if fpath:
         image.save(fpath, format='png', quality=100, subsampling=0)
         np.save(fpath, np.array(image))
 
@@ -129,3 +138,44 @@ housegan_labels = {"living_room": 1, "kitchen": 2, "bedroom": 3, "bathroom": 4, 
 regex = re.compile(r".*?\((.*?)\)")
 
 
+def get_imgs(genomes, backgrounds=None):
+    dims = genomes.dims
+    result = []
+    for i in range(dims[0]):
+        for j in range(dims[1]):
+            if genomes[i, j] == 0.0:
+                img = Image.new('RGB', (256, 256), color=(255, 255, 255))
+            else:
+                bg_img = backgrounds[i * dims[1] + j] if backgrounds is not None else None
+                img = genomes[i, j].get_image(bg_img=bg_img)
+
+            result.append(img)
+
+    return result
+
+
+def image_grid(imgs, rows, cols, text_h=50):
+    assert len(imgs) == rows * cols
+
+    horizontal = sorted([
+                    (i + 1, j + 1) for j in range(4) for i in range(4)
+                    if j <= i
+                ], key=lambda x: x[1])
+
+    w, h = imgs[0].size
+    grid = Image.new('RGBA', size=(cols * w, rows * h + text_h))
+    draw = ImageDraw.Draw(grid)
+
+    for i, img in enumerate(imgs):
+        grid.paste(img, box=(i % cols * w, i // cols * h + text_h))
+
+    _width = 2
+    for i, img in enumerate(imgs):
+        draw.rectangle(((i % cols * w - _width, i // cols * h + text_h - _width),
+                        ((i % cols + 1) * w - _width, (i // cols + 1) * h + text_h - _width),),
+                       outline=(0, 0, 0, 255), width=1)
+
+    font = ImageFont.truetype(font="jet2.ttf", size=40)
+    for i, typ in enumerate(horizontal):
+        draw.text((i * w + w // 3, 0), f"{typ[0]}B{typ[1]}B", font=font, fill=(0, 0, 0, 255), align="center")
+    return grid

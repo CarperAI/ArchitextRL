@@ -72,7 +72,7 @@ class ArchitextGenotype(Genotype):
             return None
         else:
             gfa_entropy = self.design_json["metrics"]["gfa_entropy"]
-            if self.typology() in self.typologies_from:
+            if self.typology() in self.typologies_from and not np.isnan(gfa_entropy) and not np.isinf(gfa_entropy):
                 typ = self.typologies_from[self.typology()]
             else:
                 return None
@@ -86,7 +86,7 @@ class ArchitextGenotype(Genotype):
           - self.design_colors: a list of colors accompanying the polygons
           - self.design_merged_polygon: a merged polygon
         """
-        match = pattern.match(self.design_string)
+        match = pattern.search(self.design_string)
         self.design_json = {"prompt": "", "layout": {}, "metrics": {}, "valid": False}
         self.design_polygons = []
         self.design_colors = []
@@ -100,8 +100,8 @@ class ArchitextGenotype(Genotype):
         valid = True
         color_regex = re.compile(rf"(" + r"|".join(list(self.visualization_dict.keys())) + rf")")
         for room in rooms.findall(layout):
-            self.design_json["layout"][room[0]] = [(float(x), float(y)) for x, y in coords.findall(room[1])]
             try:
+                self.design_json["layout"][room[0]] = [(float(x), float(y)) for x, y in coords.findall(room[1])]
                 polygon = make_valid(Polygon(self.design_json["layout"][room[0]]))
                 if polygon.geom_type == "MultiPolygon":
                     polygon = list(polygon.geoms)
@@ -149,8 +149,10 @@ class ArchitextGenotype(Genotype):
             for j in range(i + 1, len(self.design_polygons)):
                 try:
                     if self.design_polygons[i].overlaps(self.design_polygons[j]):
-                        self.design_json["error"] = ErrorType.OverlappingPolygons
-                        return False
+                        self.design_polygons[i] = self.design_polygons[i].difference(self.design_polygons[j])
+                        assert self.design_polygons[i].geom_type == "Polygon"
+                        #self.design_json["error"] = ErrorType.OverlappingPolygons
+                        #return False
                 except:
                     self.design_json["error"] = ErrorType.OtherError
                     return False
@@ -165,6 +167,8 @@ class ArchitextGenotype(Genotype):
                 continue
             coord = "".join([f"({x},{y})" for x, y in design_dict["layout"][rm]])
             coord_strings.append(f"{rm}: {coord},")
+        if coord_strings:  # remove the last comma
+            coord_strings[-1] = coord_strings[-1][:-1]
         return prefix + " ".join(coord_strings) + " <|endoftext|>"
 
     def to_design_string(self) -> str:
@@ -196,9 +200,10 @@ class ArchitextGenotype(Genotype):
 
     def gfa_entropy(self) -> float:
         if self.valid:
-            room_gfa = [rm.area for rm in self.design_polygons]
-            gfa_entropy = calc_entropy(room_gfa)
-            return gfa_entropy
+            room_areas = np.array([rm.area for rm in self.design_polygons])
+            room_area_perc = room_areas / room_areas.sum()
+            entropy = -np.sum(room_area_perc * np.log(room_area_perc))
+            return entropy
         else:
             return float("nan")
 
@@ -212,10 +217,10 @@ class ArchitextGenotype(Genotype):
         else:
             return -1, -1
 
-    def get_image(self):
+    def get_image(self, bg_img=None):
         polygons = self.design_polygons
         colors = self.design_colors
-        return draw_polygons(polygons, colors)[1]
+        return draw_polygons(polygons, colors, bg_img=bg_img)[1]
 
     @property
     def valid(self):
